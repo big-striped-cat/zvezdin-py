@@ -1,7 +1,7 @@
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 
 class ExtrapolatedList:
@@ -143,29 +143,91 @@ def calc_location(point: Decimal, level: Level) -> Location:
     return Location.INSIDE
 
 
-def count_level_touch(window: List[Decimal], level: Level):
+Interaction = Union[LevelEntry, LevelExit]
+
+
+def calc_level_interactions(window: List[Decimal], level: Level) -> List[Interaction]:
     locations = [calc_location(point, level) for point in window]
-    entries = []
-    exits = []
+
+    interactions = []
     for prev_location, next_location in zip(locations[:-1], locations[1:]):
         if prev_location == next_location:
             continue
 
-        # todo: location ordering
         if prev_location == Location.DOWN and next_location == Location.INSIDE:
-            entries.append(LevelEntry.DOWN_UP)
+            interactions.append(LevelEntry.DOWN_UP)
         if prev_location == Location.UP and next_location == Location.INSIDE:
-            entries.append(LevelEntry.UP_DOWN)
+            interactions.append(LevelEntry.UP_DOWN)
 
         if prev_location == Location.INSIDE and next_location == Location.DOWN:
-            exits.append(LevelExit.UP_DOWN)
+            interactions.append(LevelExit.UP_DOWN)
         if prev_location == Location.INSIDE and next_location == Location.UP:
-            exits.append(LevelExit.DOWN_UP)
+            interactions.append(LevelExit.DOWN_UP)
 
         if prev_location == Location.DOWN and next_location == Location.UP:
-            entries.append(LevelEntry.DOWN_UP)
-            exits.append(LevelExit.DOWN_UP)
+            interactions.append(LevelEntry.DOWN_UP)
+            interactions.append(LevelExit.DOWN_UP)
         if prev_location == Location.UP and next_location == Location.DOWN:
-            entries.append(LevelEntry.UP_DOWN)
-            exits.append(LevelExit.UP_DOWN)
+            interactions.append(LevelEntry.UP_DOWN)
+            interactions.append(LevelExit.UP_DOWN)
 
+    return interactions
+
+
+def has_touch_up(interactions: List[Interaction]) -> bool:
+    for item, next_item in zip(interactions[:-1], interactions[1:]):
+        if item == LevelEntry.UP_DOWN and next_item == LevelExit.DOWN_UP:
+            return True
+
+    return False
+
+
+def has_touch_down(interactions: List[Interaction]) -> bool:
+    for item, next_item in zip(interactions[:-1], interactions[1:]):
+        if item == LevelEntry.DOWN_UP and next_item == LevelExit.UP_DOWN:
+            return True
+
+    return False
+
+
+def calc_touch_downs(interactions: List[Interaction]) -> int:
+    res = 0
+    for item, next_item in zip(interactions[:-1], interactions[1:]):
+        if item == LevelEntry.DOWN_UP and next_item == LevelExit.UP_DOWN:
+            res += 1
+    return res
+
+
+def calc_touch_ups(interactions: List[Interaction]) -> int:
+    res = 0
+    for item, next_item in zip(interactions[:-1], interactions[1:]):
+        if item == LevelEntry.UP_DOWN and next_item == LevelExit.DOWN_UP:
+            res += 1
+    return res
+
+
+def create_long_order():
+    pass
+
+
+def create_short_order():
+    pass
+
+
+def strategy(window):
+    point = window[-1]
+    trend = calcTrend(window)
+    levels = calcLevels(window)
+    level_highest = get_highest_level(levels)
+    level_lowest = get_lowest_level(levels)
+
+    interactions_highest = calc_level_interactions(window, level_highest)
+    interactions_lowest = calc_level_interactions(window, level_lowest)
+
+    if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level_highest) == Location.UP \
+            and calc_touch_downs(interactions_highest) >= 2:
+        create_long_order()
+
+    if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level_lowest) == Location.DOWN \
+            and calc_touch_ups(interactions_lowest) >= 2:
+        create_short_order()
