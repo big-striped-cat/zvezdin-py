@@ -225,9 +225,9 @@ def strategy(window):
     interactions_lowest = calc_level_interactions(window, level_lowest)
 
     if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level_highest) == Location.UP \
-            and calc_touch_downs(interactions_highest) >= 2:
+            and calc_touch_ups(interactions_highest) >= 1:
         create_long_order()
 
     if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level_lowest) == Location.DOWN \
-            and calc_touch_ups(interactions_lowest) >= 2:
+            and calc_touch_downs(interactions_lowest) >= 1:
         create_short_order()
