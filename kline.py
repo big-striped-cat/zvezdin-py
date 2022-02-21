@@ -2,6 +2,7 @@ import csv
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from typing import Iterator
 
 
 @dataclass
@@ -40,3 +41,10 @@ def read_klines_from_csv(path, skip_header=False) -> list[Kline]:
             ))
 
     return res
+
+
+def get_moving_window_iterator(values: list, size) -> Iterator[list]:
+    start = 0
+    while start + size <= len(values):
+        yield values[start: start + size]
+        start += 1

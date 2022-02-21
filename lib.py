@@ -1,7 +1,11 @@
+import enum
 from collections import defaultdict
+from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional
+
+from kline import Kline
 
 
 class ExtrapolatedList:
@@ -206,15 +210,30 @@ def calc_touch_ups(interactions: List[Interaction]) -> int:
     return res
 
 
-def create_long_order():
-    pass
+class OrderType(enum.Enum):
+    LONG = 1
+    SHORT = 2
 
 
-def create_short_order():
-    pass
+@dataclass
+class Order:
+    type: OrderType
+    kline: Kline
 
 
-def strategy(window):
+def create_long_order(kline: Kline):
+    print('open long position %s', kline.open_time.strftime('%Y-%m-%d %H:%M'))
+    return Order(type=OrderType.LONG, kline=kline)
+
+
+def create_short_order(kline: Kline):
+    print('open short position %s', kline.open_time.strftime('%Y-%m-%d %H:%M'))
+    return Order(type=OrderType.SHORT, kline=kline)
+
+
+def strategy_basic(klines: List[Kline]) -> Optional[Order]:
+    kline = klines[-1]
+    window = [k.close for k in klines]
     point = window[-1]
     trend = calcTrend(window)
     levels = calcLevels(window)
@@ -226,8 +245,8 @@ def strategy(window):
 
     if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level_highest) == Location.UP \
             and calc_touch_ups(interactions_highest) >= 1:
-        create_long_order()
+        return create_long_order(kline)
 
     if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level_lowest) == Location.DOWN \
             and calc_touch_downs(interactions_lowest) >= 1:
-        create_short_order()
+        return create_short_order(kline)

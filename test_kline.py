@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from kline import read_klines_from_csv, Kline
+from kline import read_klines_from_csv, Kline, get_moving_window_iterator
 
 
 def test_read_klines_from_csv_basic():
@@ -46,3 +46,21 @@ def test_read_klines_from_csv_skip_header():
             volume=Decimal('48.5')
         ),
     ]
+
+
+def test_get_moving_window_iterator():
+    values = [4, 5, 6, 7]
+    windows = list(get_moving_window_iterator(values, 1))
+    assert windows == [[4], [5], [6], [7]]
+
+    windows = list(get_moving_window_iterator(values, 2))
+    assert windows == [[4, 5], [5, 6], [6, 7]]
+
+    windows = list(get_moving_window_iterator(values, 3))
+    assert windows == [[4, 5, 6], [5, 6, 7]]
+
+    windows = list(get_moving_window_iterator(values, 4))
+    assert windows == [[4, 5, 6, 7]]
+
+    windows = list(get_moving_window_iterator(values, 5))
+    assert windows == []
