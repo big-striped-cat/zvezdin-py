@@ -59,13 +59,13 @@ def test_calc_trend():
     assert calc_trend_int([5, 6, 7]) == Trend.FLAT
     assert calc_trend_int([5, 6, 7, 8]) == Trend.FLAT
     assert calc_trend_int([5, 7, 6, 8]) == Trend.UP
-    assert calc_trend_int([5, 8, 7, 8]) == Trend.UP
-    assert calc_trend_int([5, 9, 7, 8]) == Trend.UP
+    assert calc_trend_int([5, 8, 7, 8]) == Trend.FLAT
+    assert calc_trend_int([5, 9, 7, 8]) == Trend.DOWN
 
-    assert calc_trend_int([7, 6, 5]) == Trend.DOWN
-    assert calc_trend_int([8, 7, 6, 5]) == Trend.DOWN
+    assert calc_trend_int([7, 6, 5]) == Trend.FLAT
+    assert calc_trend_int([8, 7, 6, 5]) == Trend.FLAT
     assert calc_trend_int([8, 6, 7, 5]) == Trend.DOWN
-    assert calc_trend_int([8, 7, 8, 5]) == Trend.DOWN
-    assert calc_trend_int([8, 7, 9, 5]) == Trend.DOWN
+    assert calc_trend_int([8, 7, 8, 5]) == Trend.FLAT
+    assert calc_trend_int([8, 7, 9, 5]) == Trend.UP
 
-    assert calc_trend_int([7, 6, 5, 6]) == Trend.FLAT
+    assert calc_trend_int([7, 6, 5, 6]) == Trend.DOWN
