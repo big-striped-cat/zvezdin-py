@@ -1,13 +1,16 @@
 import csv
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Iterator
+from typing import Iterator, Optional
+
+import pytz
 
 
 @dataclass
 class Kline:
     open_time: datetime
+    close_time: datetime
     open: Decimal
     high: Decimal
     low: Decimal
@@ -15,7 +18,11 @@ class Kline:
     volume: Decimal = Decimal(0)
 
 
-def read_klines_from_csv(path, skip_header=False) -> list[Kline]:
+def read_klines_from_csv(
+        path: str,
+        skip_header: bool = False,
+        timeframe: timedelta = timedelta()
+        ) -> list[Kline]:
     res = []
     field_names = ['open_time', 'open', 'high', 'low', 'close', 'volume']
 
@@ -24,8 +31,14 @@ def read_klines_from_csv(path, skip_header=False) -> list[Kline]:
             next(f)
         reader = csv.DictReader(f, fieldnames=field_names)
         for row in reader:
-            open_time = datetime.fromtimestamp(int(row['open_time']) / 1000)
-            open_price = Decimal(row['open'])  # clashes with `open` python keyword
+            open_time = datetime.fromtimestamp(int(row['open_time']) / 1000, tz=pytz.UTC)
+
+            # close_time in Binance market data looks like 1642637099999, which is next kline open time minus 1ms.
+            # This is not nice time for logging.
+            # Better to construct close_time manually
+            close_time = open_time + timeframe
+
+            open_price = Decimal(row['open'])  # do not clash with `open` python keyword
             high = Decimal(row['high'])
             low = Decimal(row['low'])
             close = Decimal(row['close'])
@@ -33,6 +46,7 @@ def read_klines_from_csv(path, skip_header=False) -> list[Kline]:
 
             res.append(Kline(
                 open_time=open_time,
+                close_time=close_time,
                 open=open_price,
                 high=high,
                 low=low,

@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import List
 
-from lib import ExtrapolatedList, calcLocalMaximums, calcTrendByExtremums, Trend, calcTrend
+from strategy import ExtrapolatedList, calcLocalMaximums, calcTrendByExtremums, Trend, calcTrend
 
 
 def test_extrapolated_list():

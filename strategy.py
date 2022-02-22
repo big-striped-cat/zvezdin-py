@@ -6,6 +6,7 @@ from enum import Enum
 from typing import List, Tuple, Union, Optional
 
 from kline import Kline
+from logger import Logger
 
 
 class ExtrapolatedList:
@@ -221,17 +222,21 @@ class Order:
     kline: Kline
 
 
-def create_long_order(kline: Kline):
-    print('open long position %s', kline.open_time.strftime('%Y-%m-%d %H:%M'))
+def create_long_order(kline: Kline, logger: Logger):
+    close_time_str = logger.format_datetime(kline.close_time)
+    logger.log(f'open long position {close_time_str}')
+
     return Order(type=OrderType.LONG, kline=kline)
 
 
-def create_short_order(kline: Kline):
-    print('open short position %s', kline.open_time.strftime('%Y-%m-%d %H:%M'))
+def create_short_order(kline: Kline, logger: Logger):
+    close_time_str = logger.format_datetime(kline.close_time)
+    logger.log(f'open short position {close_time_str}')
+
     return Order(type=OrderType.SHORT, kline=kline)
 
 
-def strategy_basic(klines: List[Kline]) -> Optional[Order]:
+def strategy_basic(klines: List[Kline], logger: Logger) -> Optional[Order]:
     kline = klines[-1]
     window = [k.close for k in klines]
     point = window[-1]
@@ -245,8 +250,8 @@ def strategy_basic(klines: List[Kline]) -> Optional[Order]:
 
     if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level_highest) == Location.UP \
             and calc_touch_ups(interactions_highest) >= 1:
-        return create_long_order(kline)
+        return create_long_order(kline, logger)
 
     if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level_lowest) == Location.DOWN \
             and calc_touch_downs(interactions_lowest) >= 1:
-        return create_short_order(kline)
+        return create_short_order(kline, logger)
