@@ -30,15 +30,15 @@ class Trend(Enum):
     FLAT = 3
 
 
-def calcTrend(window: List[Decimal]) -> Trend:
+def calc_trend(window: List[Decimal]) -> Trend:
     """
-    `calcTrend` is supposed to run on relatively large window, where some waves are present.
+    `calc_trend` is supposed to run on relatively large window, where some waves are present.
     """
-    maximums = calcLocalMaximums(window)
-    return calcTrendByExtremums(maximums)
+    maximums = calc_local_maximums(window)
+    return calc_trend_by_extremums(maximums)
 
 
-def calcTrendByExtremums(extremums: List[Decimal]) -> Trend:
+def calc_trend_by_extremums(extremums: List[Decimal]) -> Trend:
     high = max(extremums)
     low = min(extremums)
 
@@ -59,7 +59,7 @@ def calcTrendByExtremums(extremums: List[Decimal]) -> Trend:
     return Trend.FLAT
 
 
-def calcLocalMaximums(window: List[Decimal], radius: int = 1) -> List[Decimal]:
+def calc_local_maximums(window: List[Decimal], radius: int = 1) -> List[Decimal]:
     # todo: skip endpoints ?
     window = ExtrapolatedList(window)
     res = []
@@ -77,7 +77,7 @@ def calcLocalMaximums(window: List[Decimal], radius: int = 1) -> List[Decimal]:
 Level = Tuple[Decimal, Decimal]
 
 
-def calcLevels(window: List[Decimal]) -> List[Level]:
+def calc_levels(window: List[Decimal]) -> List[Level]:
     eps = Decimal(1)  # depends on asset
     value_max = max(window) + eps
     value_min = min(window)
@@ -240,8 +240,8 @@ def strategy_basic(klines: List[Kline], logger: Logger) -> Optional[Order]:
     kline = klines[-1]
     window = [k.close for k in klines]
     point = window[-1]
-    trend = calcTrend(window)
-    levels = calcLevels(window)
+    trend = calc_trend(window)
+    levels = calc_levels(window)
     level_highest = get_highest_level(levels)
     level_lowest = get_lowest_level(levels)
 
