@@ -239,7 +239,7 @@ class Decision:
 def create_decision(order_type: OrderType, kline: Kline, level: Level, logger: Logger) -> Decision:
     close_time_str = logger.format_datetime(kline.close_time)
     level_str = f'Level[{level[0]}, {level[1]}]'
-    logger.log(f'open {order_type} position {close_time_str} on {level_str}')
+    logger.log(f'create decision {order_type} {close_time_str} on {level_str}')
 
     order = Order(type=order_type, price=kline.close)
     return Decision(
@@ -274,3 +274,33 @@ def strategy_basic(klines: List[Kline], logger: Logger) -> Optional[Decision]:
     if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level_lowest) == Location.DOWN \
             and calc_touch_downs(interactions_lowest) >= 1:
         return create_decision_short(kline, level_lowest, logger)
+
+
+def calc_levels_intersection_rate(level_a, level_b) -> Decimal:
+    a_low, a_high = level_a
+    b_low, b_high = level_b
+
+    if a_low >= b_high:
+        return Decimal(0)
+    if b_low >= a_high:
+        return Decimal(0)
+
+    segment_1 = a_high - b_low
+    segment_2 = b_high - a_low
+    common_segment = min(segment_1, segment_2)
+
+    size_a = a_high - a_low
+    size_b = b_high - b_low
+
+    return 2 * common_segment / (size_a + size_b)
+
+
+def is_duplicate_decision(decision_a: Decision, decision_b: Decision, level_intersection_threshold: Decimal):
+    if decision_a.order.type != decision_b.order.type:
+        return False
+
+    levels_intersection_rate = calc_levels_intersection_rate(decision_a.level, decision_b.level)
+    if levels_intersection_rate >= level_intersection_threshold:
+        return True
+
+    return False
