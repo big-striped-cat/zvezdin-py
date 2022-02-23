@@ -1,6 +1,7 @@
 import enum
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from typing import List, Tuple, Union, Optional
@@ -215,28 +216,46 @@ class OrderType(enum.Enum):
     LONG = 1
     SHORT = 2
 
+    def __str__(self):
+        return {
+            OrderType.LONG: 'long',
+            OrderType.SHORT: 'short',
+        }[self]
+
 
 @dataclass
 class Order:
     type: OrderType
-    kline: Kline
+    price: Decimal
 
 
-def create_long_order(kline: Kline, logger: Logger):
+@dataclass
+class Decision:
+    order: Order
+    created_at: datetime
+    level: Level
+
+
+def create_decision(order_type: OrderType, kline: Kline, level: Level, logger: Logger) -> Decision:
     close_time_str = logger.format_datetime(kline.close_time)
-    logger.log(f'open long position {close_time_str}')
+    level_str = f'Level[{level[0]}, {level[1]}]'
+    logger.log(f'open {order_type} position {close_time_str} on {level_str}')
 
-    return Order(type=OrderType.LONG, kline=kline)
-
-
-def create_short_order(kline: Kline, logger: Logger):
-    close_time_str = logger.format_datetime(kline.close_time)
-    logger.log(f'open short position {close_time_str}')
-
-    return Order(type=OrderType.SHORT, kline=kline)
+    order = Order(type=order_type, price=kline.close)
+    return Decision(
+        order=order, created_at=kline.close_time, level=level
+    )
 
 
-def strategy_basic(klines: List[Kline], logger: Logger) -> Optional[Order]:
+def create_decision_long(kline: Kline, level: Level, logger: Logger) -> Decision:
+    return create_decision(OrderType.LONG, kline, level, logger)
+
+
+def create_decision_short(kline: Kline, level: Level, logger: Logger) -> Decision:
+    return create_decision(OrderType.SHORT, kline, level, logger)
+
+
+def strategy_basic(klines: List[Kline], logger: Logger) -> Optional[Decision]:
     kline = klines[-1]
     window = [k.close for k in klines]
     point = window[-1]
@@ -250,8 +269,8 @@ def strategy_basic(klines: List[Kline], logger: Logger) -> Optional[Order]:
 
     if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level_highest) == Location.UP \
             and calc_touch_ups(interactions_highest) >= 1:
-        return create_long_order(kline, logger)
+        return create_decision_long(kline, level_highest, logger)
 
     if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level_lowest) == Location.DOWN \
             and calc_touch_downs(interactions_lowest) >= 1:
-        return create_short_order(kline, logger)
+        return create_decision_short(kline, level_lowest, logger)
