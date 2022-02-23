@@ -223,17 +223,46 @@ class OrderType(enum.Enum):
         }[self]
 
 
+class TradeType(enum.Enum):
+    BUY = 1
+    SELL = 2
+
+    def __str__(self):
+        return {
+            TradeType.BUY: 'buy',
+            TradeType.SELL: 'sell',
+        }[self]
+
+
 @dataclass
-class Order:
-    type: OrderType
+class Trade:
+    type: TradeType
     price: Decimal
+    amount: Decimal
+    created_at: datetime
+
+    def value(self):
+        return self.price * self.amount
 
 
 @dataclass
 class Decision:
-    order: Order
-    created_at: datetime
+    order_type: OrderType
+    trade_open: Trade
+    trade_close: Optional[Trade]
     level: Level
+    price_take_profit: Decimal
+    price_stop_loss: Decimal
+
+    def get_profit(self):
+        profit = self.trade_close.value() - self.trade_open.value()
+        return {
+            OrderType.LONG: profit,
+            OrderType.SHORT: -profit,
+        }[self.order_type]
+
+    def is_profit(self):
+        return self.get_profit() > 0
 
 
 def create_decision(order_type: OrderType, kline: Kline, level: Level, logger: Logger) -> Decision:
@@ -241,9 +270,24 @@ def create_decision(order_type: OrderType, kline: Kline, level: Level, logger: L
     level_str = f'Level[{level[0]}, {level[1]}]'
     logger.log(f'create decision {order_type} {close_time_str} on {level_str}')
 
-    order = Order(type=order_type, price=kline.close)
+    trade_type = {
+        OrderType.LONG: TradeType.BUY,
+        OrderType.SHORT: TradeType.SELL,
+    }[order_type]
+
+    trade_open = Trade(
+        type=trade_type,
+        price=kline.close,
+        amount=Decimal(1),
+        created_at=kline.close_time
+    )
     return Decision(
-        order=order, created_at=kline.close_time, level=level
+        order_type=order_type,
+        trade_open=trade_open,
+        trade_close=None,
+        level=level,
+        price_take_profit=kline.close,
+        price_stop_loss=kline.close,
     )
 
 
@@ -296,7 +340,7 @@ def calc_levels_intersection_rate(level_a, level_b) -> Decimal:
 
 
 def is_duplicate_decision(decision_a: Decision, decision_b: Decision, level_intersection_threshold: Decimal):
-    if decision_a.order.type != decision_b.order.type:
+    if decision_a.order_type != decision_b.order_type:
         return False
 
     levels_intersection_rate = calc_levels_intersection_rate(decision_a.level, decision_b.level)
@@ -304,3 +348,7 @@ def is_duplicate_decision(decision_a: Decision, decision_b: Decision, level_inte
         return True
 
     return False
+
+
+def is_price_achieved(kline: Kline, price: Decimal):
+    return kline.low <= price <= kline.high

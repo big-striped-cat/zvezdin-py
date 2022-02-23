@@ -8,10 +8,9 @@ from logger import Logger
 from strategy import strategy_basic, is_duplicate_decision
 
 
-def app():
-    path = 'market_data/BTCBUSD-5m-2022-02-18.csv'
+def backtest_strategy(klines_csv_path):
     klines = read_klines_from_csv(
-        path,
+        klines_csv_path,
         skip_header=True,
         timeframe=timedelta(minutes=5)
     )
@@ -35,8 +34,9 @@ def app():
         else:
             logger.log('Duplicate decision. Skip.')
 
-    print(f'total orders: {len(decisions)}')
+    logger.log(f'total orders: {len(decisions)}')
 
 
 if __name__ == '__main__':
-    app()
+    path = 'market_data/BTCBUSD-5m-2022-02-18.csv'
+    backtest_strategy(path)
