@@ -264,16 +264,31 @@ class Decision:
     def is_profit(self):
         return self.get_profit() > 0
 
+    @property
+    def is_closed(self):
+        return self.trade_close is not None
+
+
+def get_trade_open_type(order_type: OrderType) -> TradeType:
+    return {
+        OrderType.LONG: TradeType.BUY,
+        OrderType.SHORT: TradeType.SELL,
+    }[order_type]
+
+
+def get_trade_close_type(order_type: OrderType) -> TradeType:
+    return {
+        OrderType.LONG: TradeType.SELL,
+        OrderType.SHORT: TradeType.BUY,
+    }[order_type]
+
 
 def create_decision(order_type: OrderType, kline: Kline, level: Level, logger: Logger) -> Decision:
     close_time_str = logger.format_datetime(kline.close_time)
     level_str = f'Level[{level[0]}, {level[1]}]'
     logger.log(f'create decision {order_type} {close_time_str} on {level_str}')
 
-    trade_type = {
-        OrderType.LONG: TradeType.BUY,
-        OrderType.SHORT: TradeType.SELL,
-    }[order_type]
+    trade_type = get_trade_open_type(order_type)
 
     trade_open = Trade(
         type=trade_type,
@@ -350,5 +365,46 @@ def is_duplicate_decision(decision_a: Decision, decision_b: Decision, level_inte
     return False
 
 
-def is_price_achieved(kline: Kline, price: Decimal):
+def is_price_achieved(kline: Kline, price: Decimal) -> bool:
     return kline.low <= price <= kline.high
+
+
+def is_take_profit_achieved(kline: Kline, decision: Decision) -> bool:
+    return is_price_achieved(kline, decision.price_take_profit)
+
+
+def is_stop_loss_achieved(kline: Kline, decision: Decision) -> bool:
+    return is_price_achieved(kline, decision.price_stop_loss)
+
+
+def close_order_by_take_profit(kline: Kline, decision: Decision):
+    trade_type = get_trade_close_type(decision.order_type)
+
+    decision.trade_close = Trade(
+        type=trade_type,
+        price=decision.price_take_profit,
+        amount=decision.trade_open.amount,
+        created_at=kline.open_time,  # or close_time or ... ?
+    )
+
+
+def close_order_by_stop_loss(kline: Kline, decision: Decision):
+    trade_type = get_trade_close_type(decision.order_type)
+
+    decision.trade_close = Trade(
+        type=trade_type,
+        price=decision.price_stop_loss,
+        amount=decision.trade_open.amount,
+        created_at=kline.open_time,  # or close_time or ... ?
+    )
+
+
+def maybe_close_order(kline: Kline, decision: Decision):
+    if is_take_profit_achieved(kline, decision) and is_stop_loss_achieved(kline, decision):
+        raise Exception('Undefined behaviour. Take profit and stop loss both achieved.')
+
+    if is_take_profit_achieved(kline, decision):
+        close_order_by_take_profit(kline, decision)
+
+    if is_stop_loss_achieved(kline, decision):
+        close_order_by_stop_loss(kline, decision)

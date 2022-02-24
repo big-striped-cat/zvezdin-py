@@ -2,8 +2,11 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List
 
+from kline import Kline
 from strategy import ExtrapolatedList, calc_local_maximums, calc_trend_by_extremums, Trend, calc_trend, \
-    calc_levels_intersection_rate, is_duplicate_decision, Decision, Order, OrderType
+    calc_levels_intersection_rate, is_duplicate_decision, Decision, OrderType, maybe_close_order, Trade, \
+    TradeType
+from test_utils import datetime_from_str
 
 
 def test_extrapolated_list():
@@ -147,3 +150,145 @@ class TestIsDuplicateDecision:
 
         threshold = Decimal('0.8')
         assert not is_duplicate_decision(decision_a, decision_b, threshold)
+
+
+class TestMaybeCloseOrder:
+    def test_long_close_by_take_profit(self):
+        kline = Kline(
+            open_time=datetime_from_str('2022-01-01 18:00'),
+            close_time=datetime_from_str('2022-01-01 18:05'),
+            open=Decimal(40),
+            close=Decimal(50),
+            high=Decimal(60),
+            low=Decimal(30)
+        )
+        trade_open = Trade(
+            type=TradeType.BUY,
+            price=Decimal(30),
+            amount=Decimal(1),
+            created_at=datetime_from_str('2022-01-01 17:50')
+        )
+        level = (Decimal(), Decimal())
+        decision = Decision(
+            order_type=OrderType.LONG,
+            trade_open=trade_open,
+            trade_close=None,
+            level=level,
+            price_take_profit=Decimal(55),
+            price_stop_loss=Decimal(20)
+        )
+        maybe_close_order(kline, decision)
+        assert decision.is_closed
+        assert decision.trade_close.price == Decimal(55)
+
+    def test_long_close_by_stop_loss(self):
+        kline = Kline(
+            open_time=datetime_from_str('2022-01-01 18:00'),
+            close_time=datetime_from_str('2022-01-01 18:05'),
+            open=Decimal(40),
+            close=Decimal(50),
+            high=Decimal(60),
+            low=Decimal(30)
+        )
+        trade_open = Trade(
+            type=TradeType.BUY,
+            price=Decimal(70),
+            amount=Decimal(1),
+            created_at=datetime_from_str('2022-01-01 17:50')
+        )
+        level = (Decimal(), Decimal())
+        decision = Decision(
+            order_type=OrderType.LONG,
+            trade_open=trade_open,
+            trade_close=None,
+            level=level,
+            price_take_profit=Decimal(100),
+            price_stop_loss=Decimal(35)
+        )
+        maybe_close_order(kline, decision)
+        assert decision.is_closed
+        assert decision.trade_close.price == Decimal(35)
+
+    def test_short_close_by_take_profit(self):
+        kline = Kline(
+            open_time=datetime_from_str('2022-01-01 18:00'),
+            close_time=datetime_from_str('2022-01-01 18:05'),
+            open=Decimal(40),
+            close=Decimal(50),
+            high=Decimal(60),
+            low=Decimal(30)
+        )
+        trade_open = Trade(
+            type=TradeType.SELL,
+            price=Decimal(70),
+            amount=Decimal(1),
+            created_at=datetime_from_str('2022-01-01 17:50')
+        )
+        level = (Decimal(), Decimal())
+        decision = Decision(
+            order_type=OrderType.LONG,
+            trade_open=trade_open,
+            trade_close=None,
+            level=level,
+            price_take_profit=Decimal(35),
+            price_stop_loss=Decimal(100)
+        )
+        maybe_close_order(kline, decision)
+        assert decision.is_closed
+        assert decision.trade_close.price == Decimal(35)
+
+    def test_short_close_by_stop_loss(self):
+        kline = Kline(
+            open_time=datetime_from_str('2022-01-01 18:00'),
+            close_time=datetime_from_str('2022-01-01 18:05'),
+            open=Decimal(40),
+            close=Decimal(50),
+            high=Decimal(60),
+            low=Decimal(30)
+        )
+        trade_open = Trade(
+            type=TradeType.SELL,
+            price=Decimal(30),
+            amount=Decimal(1),
+            created_at=datetime_from_str('2022-01-01 17:50')
+        )
+        level = (Decimal(), Decimal())
+        decision = Decision(
+            order_type=OrderType.LONG,
+            trade_open=trade_open,
+            trade_close=None,
+            level=level,
+            price_take_profit=Decimal(55),
+            price_stop_loss=Decimal(20)
+        )
+        maybe_close_order(kline, decision)
+        assert decision.is_closed
+        assert decision.trade_close.price == Decimal(55)
+
+    def test_do_nothing(self):
+        kline = Kline(
+            open_time=datetime_from_str('2022-01-01 18:00'),
+            close_time=datetime_from_str('2022-01-01 18:05'),
+            open=Decimal(40),
+            close=Decimal(50),
+            high=Decimal(60),
+            low=Decimal(30)
+        )
+        trade_open = Trade(
+            type=TradeType.BUY,
+            price=Decimal(30),
+            amount=Decimal(1),
+            created_at=datetime_from_str('2022-01-01 17:50')
+        )
+        level = (Decimal(), Decimal())
+        decision = Decision(
+            order_type=OrderType.LONG,
+            trade_open=trade_open,
+            trade_close=None,
+            level=level,
+            price_take_profit=Decimal(65),
+            price_stop_loss=Decimal(20)
+        )
+        maybe_close_order(kline, decision)
+        assert not decision.is_closed
+        assert decision.trade_close is None

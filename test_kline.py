@@ -1,16 +1,10 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 import pytz
 
 from kline import read_klines_from_csv, Kline, get_moving_window_iterator
-
-
-def datetime_from_str(s: str):
-    # assign UTC timezone, do not move clock
-    return pytz.UTC.localize(
-        datetime.strptime(s, '%Y-%m-%d %H:%M')
-    )
+from test_utils import datetime_from_str
 
 
 def test_read_klines_from_csv_basic():
