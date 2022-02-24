@@ -246,7 +246,7 @@ class Trade:
 
 
 @dataclass
-class Decision:
+class Order:
     order_type: OrderType
     trade_open: Trade
     trade_close: Optional[Trade]
@@ -283,10 +283,10 @@ def get_trade_close_type(order_type: OrderType) -> TradeType:
     }[order_type]
 
 
-def create_decision(order_type: OrderType, kline: Kline, level: Level, logger: Logger) -> Decision:
+def create_order(order_type: OrderType, kline: Kline, level: Level, logger: Logger) -> Order:
     close_time_str = logger.format_datetime(kline.close_time)
     level_str = f'Level[{level[0]}, {level[1]}]'
-    logger.log(f'create decision {order_type} {close_time_str} on {level_str}')
+    logger.log(f'create order {order_type} {close_time_str} on {level_str}')
 
     trade_type = get_trade_open_type(order_type)
 
@@ -296,7 +296,7 @@ def create_decision(order_type: OrderType, kline: Kline, level: Level, logger: L
         amount=Decimal(1),
         created_at=kline.close_time
     )
-    return Decision(
+    return Order(
         order_type=order_type,
         trade_open=trade_open,
         trade_close=None,
@@ -306,15 +306,15 @@ def create_decision(order_type: OrderType, kline: Kline, level: Level, logger: L
     )
 
 
-def create_decision_long(kline: Kline, level: Level, logger: Logger) -> Decision:
-    return create_decision(OrderType.LONG, kline, level, logger)
+def create_order_long(kline: Kline, level: Level, logger: Logger) -> Order:
+    return create_order(OrderType.LONG, kline, level, logger)
 
 
-def create_decision_short(kline: Kline, level: Level, logger: Logger) -> Decision:
-    return create_decision(OrderType.SHORT, kline, level, logger)
+def create_order_short(kline: Kline, level: Level, logger: Logger) -> Order:
+    return create_order(OrderType.SHORT, kline, level, logger)
 
 
-def strategy_basic(klines: List[Kline], logger: Logger) -> Optional[Decision]:
+def strategy_basic(klines: List[Kline], logger: Logger) -> Optional[Order]:
     kline = klines[-1]
     window = [k.close for k in klines]
     point = window[-1]
@@ -328,11 +328,11 @@ def strategy_basic(klines: List[Kline], logger: Logger) -> Optional[Decision]:
 
     if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level_highest) == Location.UP \
             and calc_touch_ups(interactions_highest) >= 1:
-        return create_decision_long(kline, level_highest, logger)
+        return create_order_long(kline, level_highest, logger)
 
     if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level_lowest) == Location.DOWN \
             and calc_touch_downs(interactions_lowest) >= 1:
-        return create_decision_short(kline, level_lowest, logger)
+        return create_order_short(kline, level_lowest, logger)
 
 
 def calc_levels_intersection_rate(level_a, level_b) -> Decimal:
@@ -354,11 +354,11 @@ def calc_levels_intersection_rate(level_a, level_b) -> Decimal:
     return 2 * common_segment / (size_a + size_b)
 
 
-def is_duplicate_decision(decision_a: Decision, decision_b: Decision, level_intersection_threshold: Decimal):
-    if decision_a.order_type != decision_b.order_type:
+def is_duplicate_order(order_a: Order, order_b: Order, level_intersection_threshold: Decimal):
+    if order_a.order_type != order_b.order_type:
         return False
 
-    levels_intersection_rate = calc_levels_intersection_rate(decision_a.level, decision_b.level)
+    levels_intersection_rate = calc_levels_intersection_rate(order_a.level, order_b.level)
     if levels_intersection_rate >= level_intersection_threshold:
         return True
 
@@ -369,42 +369,42 @@ def is_price_achieved(kline: Kline, price: Decimal) -> bool:
     return kline.low <= price <= kline.high
 
 
-def is_take_profit_achieved(kline: Kline, decision: Decision) -> bool:
-    return is_price_achieved(kline, decision.price_take_profit)
+def is_take_profit_achieved(kline: Kline, order: Order) -> bool:
+    return is_price_achieved(kline, order.price_take_profit)
 
 
-def is_stop_loss_achieved(kline: Kline, decision: Decision) -> bool:
-    return is_price_achieved(kline, decision.price_stop_loss)
+def is_stop_loss_achieved(kline: Kline, order: Order) -> bool:
+    return is_price_achieved(kline, order.price_stop_loss)
 
 
-def close_order_by_take_profit(kline: Kline, decision: Decision):
-    trade_type = get_trade_close_type(decision.order_type)
+def close_order_by_take_profit(kline: Kline, order: Order):
+    trade_type = get_trade_close_type(order.order_type)
 
-    decision.trade_close = Trade(
+    order.trade_close = Trade(
         type=trade_type,
-        price=decision.price_take_profit,
-        amount=decision.trade_open.amount,
+        price=order.price_take_profit,
+        amount=order.trade_open.amount,
         created_at=kline.open_time,  # or close_time or ... ?
     )
 
 
-def close_order_by_stop_loss(kline: Kline, decision: Decision):
-    trade_type = get_trade_close_type(decision.order_type)
+def close_order_by_stop_loss(kline: Kline, order: Order):
+    trade_type = get_trade_close_type(order.order_type)
 
-    decision.trade_close = Trade(
+    order.trade_close = Trade(
         type=trade_type,
-        price=decision.price_stop_loss,
-        amount=decision.trade_open.amount,
+        price=order.price_stop_loss,
+        amount=order.trade_open.amount,
         created_at=kline.open_time,  # or close_time or ... ?
     )
 
 
-def maybe_close_order(kline: Kline, decision: Decision):
-    if is_take_profit_achieved(kline, decision) and is_stop_loss_achieved(kline, decision):
+def maybe_close_order(kline: Kline, order: Order):
+    if is_take_profit_achieved(kline, order) and is_stop_loss_achieved(kline, order):
         raise Exception('Undefined behaviour. Take profit and stop loss both achieved.')
 
-    if is_take_profit_achieved(kline, decision):
-        close_order_by_take_profit(kline, decision)
+    if is_take_profit_achieved(kline, order):
+        close_order_by_take_profit(kline, order)
 
-    if is_stop_loss_achieved(kline, decision):
-        close_order_by_stop_loss(kline, decision)
+    if is_stop_loss_achieved(kline, order):
+        close_order_by_stop_loss(kline, order)

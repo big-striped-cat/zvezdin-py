@@ -4,7 +4,7 @@ from typing import List
 
 from kline import Kline
 from strategy import ExtrapolatedList, calc_local_maximums, calc_trend_by_extremums, Trend, calc_trend, \
-    calc_levels_intersection_rate, is_duplicate_decision, Decision, OrderType, maybe_close_order, Trade, \
+    calc_levels_intersection_rate, is_duplicate_order, Order, OrderType, maybe_close_order, Trade, \
     TradeType
 from test_utils import datetime_from_str
 
@@ -94,62 +94,115 @@ def test_calc_levels_intersection_rate():
     assert calc_levels_intersection_rate(level_a, level_b) == Decimal('0.5')
 
 
-class TestIsDuplicateDecision:
-    def test_identical_decisions(self):
-        created_at = datetime(2022, 1, 1)
+def create_trade(trade_type=None, price=None, amount=None, created_at=None) -> Trade:
+    trade_type = trade_type or TradeType.BUY
+    price = price or Decimal()
+    amount = amount or Decimal(1)
+    created_at = created_at or datetime(2022, 1, 1)
 
-        order_a = Order(type=OrderType.LONG, price=Decimal(2))
+    return Trade(
+        type=trade_type,
+        price=price,
+        amount=amount,
+        created_at=created_at
+    )
+
+
+def create_order(order_type=None, trade_open=None, trade_close=None, level=None) -> Order:
+    order_type = order_type or OrderType.LONG
+    trade_open = trade_open or create_trade()
+    level = level or (Decimal(), Decimal())
+
+    return Order(
+        order_type=order_type,
+        trade_open=trade_open,
+        trade_close=trade_close,
+        level=level,
+        price_take_profit=Decimal(),
+        price_stop_loss=Decimal()
+    )
+
+
+class TestIsDuplicateOrder:
+    def test_identical_orders(self):
+        trade_open_a = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
         level_a = (Decimal(1), Decimal(2))
-        decision_a = Decision(order=order_a, created_at=created_at, level=level_a)
+        order_a = create_order(
+            order_type=OrderType.LONG,
+            trade_open=trade_open_a,
+            level=level_a
+        )
 
-        order_b = Order(type=OrderType.LONG, price=Decimal(2))
+        trade_open_b = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
         level_b = (Decimal(1), Decimal(2))
-        decision_b = Decision(order=order_b, created_at=created_at, level=level_b)
+        order_b = create_order(
+            order_type=OrderType.LONG,
+            trade_open=trade_open_b,
+            level=level_b
+        )
 
         threshold = Decimal('0.8')
-        assert is_duplicate_decision(decision_a, decision_b, threshold)
+        assert is_duplicate_order(order_a, order_b, threshold)
 
-    def test_decision_different_type(self):
-        created_at = datetime(2022, 1, 1)
-
-        order_a = Order(type=OrderType.LONG, price=Decimal(2))
+    def test_order_different_type(self):
+        trade_open_a = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
         level_a = (Decimal(1), Decimal(2))
-        decision_a = Decision(order=order_a, created_at=created_at, level=level_a)
+        order_a = create_order(
+            order_type=OrderType.LONG,
+            trade_open=trade_open_a,
+            level=level_a
+        )
 
-        order_b = Order(type=OrderType.SHORT, price=Decimal(2))
+        trade_open_b = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
         level_b = (Decimal(1), Decimal(2))
-        decision_b = Decision(order=order_b, created_at=created_at, level=level_b)
+        order_b = create_order(
+            order_type=OrderType.SHORT,
+            trade_open=trade_open_b,
+            level=level_b
+        )
 
         threshold = Decimal('0.8')
-        assert not is_duplicate_decision(decision_a, decision_b, threshold)
+        assert not is_duplicate_order(order_a, order_b, threshold)
 
-    def test_decisions_similar_level(self):
-        created_at = datetime(2022, 1, 1)
-
-        order_a = Order(type=OrderType.LONG, price=Decimal(2))
+    def test_orders_similar_level(self):
+        trade_open_a = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
         level_a = (Decimal(1), Decimal(10))
-        decision_a = Decision(order=order_a, created_at=created_at, level=level_a)
+        order_a = create_order(
+            order_type=OrderType.LONG,
+            trade_open=trade_open_a,
+            level=level_a
+        )
 
-        order_b = Order(type=OrderType.LONG, price=Decimal(2))
+        trade_open_b = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
         level_b = (Decimal(2), Decimal(11))
-        decision_b = Decision(order=order_b, created_at=created_at, level=level_b)
+        order_b = create_order(
+            order_type=OrderType.LONG,
+            trade_open=trade_open_b,
+            level=level_b
+        )
 
         threshold = Decimal('0.8')
-        assert is_duplicate_decision(decision_a, decision_b, threshold)
+        assert is_duplicate_order(order_a, order_b, threshold)
 
-    def test_decisions_different_level(self):
-        created_at = datetime(2022, 1, 1)
-
-        order_a = Order(type=OrderType.LONG, price=Decimal(2))
+    def test_orders_different_level(self):
+        trade_open_a = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
         level_a = (Decimal(1), Decimal(3))
-        decision_a = Decision(order=order_a, created_at=created_at, level=level_a)
+        order_a = create_order(
+            order_type=OrderType.LONG,
+            trade_open=trade_open_a,
+            level=level_a
+        )
 
-        order_b = Order(type=OrderType.LONG, price=Decimal(2))
+        trade_open_b = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
         level_b = (Decimal(2), Decimal(4))
-        decision_b = Decision(order=order_b, created_at=created_at, level=level_b)
+        order_b = create_order(
+            order_type=OrderType.LONG,
+            trade_open=trade_open_b,
+            level=level_b
+        )
 
         threshold = Decimal('0.8')
-        assert not is_duplicate_decision(decision_a, decision_b, threshold)
+        assert not is_duplicate_order(order_a, order_b, threshold)
 
 
 class TestMaybeCloseOrder:
@@ -169,7 +222,7 @@ class TestMaybeCloseOrder:
             created_at=datetime_from_str('2022-01-01 17:50')
         )
         level = (Decimal(), Decimal())
-        decision = Decision(
+        order = Order(
             order_type=OrderType.LONG,
             trade_open=trade_open,
             trade_close=None,
@@ -177,9 +230,9 @@ class TestMaybeCloseOrder:
             price_take_profit=Decimal(55),
             price_stop_loss=Decimal(20)
         )
-        maybe_close_order(kline, decision)
-        assert decision.is_closed
-        assert decision.trade_close.price == Decimal(55)
+        maybe_close_order(kline, order)
+        assert order.is_closed
+        assert order.trade_close.price == Decimal(55)
 
     def test_long_close_by_stop_loss(self):
         kline = Kline(
@@ -197,7 +250,7 @@ class TestMaybeCloseOrder:
             created_at=datetime_from_str('2022-01-01 17:50')
         )
         level = (Decimal(), Decimal())
-        decision = Decision(
+        order = Order(
             order_type=OrderType.LONG,
             trade_open=trade_open,
             trade_close=None,
@@ -205,9 +258,9 @@ class TestMaybeCloseOrder:
             price_take_profit=Decimal(100),
             price_stop_loss=Decimal(35)
         )
-        maybe_close_order(kline, decision)
-        assert decision.is_closed
-        assert decision.trade_close.price == Decimal(35)
+        maybe_close_order(kline, order)
+        assert order.is_closed
+        assert order.trade_close.price == Decimal(35)
 
     def test_short_close_by_take_profit(self):
         kline = Kline(
@@ -225,7 +278,7 @@ class TestMaybeCloseOrder:
             created_at=datetime_from_str('2022-01-01 17:50')
         )
         level = (Decimal(), Decimal())
-        decision = Decision(
+        order = Order(
             order_type=OrderType.LONG,
             trade_open=trade_open,
             trade_close=None,
@@ -233,9 +286,9 @@ class TestMaybeCloseOrder:
             price_take_profit=Decimal(35),
             price_stop_loss=Decimal(100)
         )
-        maybe_close_order(kline, decision)
-        assert decision.is_closed
-        assert decision.trade_close.price == Decimal(35)
+        maybe_close_order(kline, order)
+        assert order.is_closed
+        assert order.trade_close.price == Decimal(35)
 
     def test_short_close_by_stop_loss(self):
         kline = Kline(
@@ -253,7 +306,7 @@ class TestMaybeCloseOrder:
             created_at=datetime_from_str('2022-01-01 17:50')
         )
         level = (Decimal(), Decimal())
-        decision = Decision(
+        order = Order(
             order_type=OrderType.LONG,
             trade_open=trade_open,
             trade_close=None,
@@ -261,9 +314,9 @@ class TestMaybeCloseOrder:
             price_take_profit=Decimal(55),
             price_stop_loss=Decimal(20)
         )
-        maybe_close_order(kline, decision)
-        assert decision.is_closed
-        assert decision.trade_close.price == Decimal(55)
+        maybe_close_order(kline, order)
+        assert order.is_closed
+        assert order.trade_close.price == Decimal(55)
 
     def test_do_nothing(self):
         kline = Kline(
@@ -281,7 +334,7 @@ class TestMaybeCloseOrder:
             created_at=datetime_from_str('2022-01-01 17:50')
         )
         level = (Decimal(), Decimal())
-        decision = Decision(
+        order = Order(
             order_type=OrderType.LONG,
             trade_open=trade_open,
             trade_close=None,
@@ -289,6 +342,6 @@ class TestMaybeCloseOrder:
             price_take_profit=Decimal(65),
             price_stop_loss=Decimal(20)
         )
-        maybe_close_order(kline, decision)
-        assert not decision.is_closed
-        assert decision.trade_close is None
+        maybe_close_order(kline, order)
+        assert not order.is_closed
+        assert order.trade_close is None
