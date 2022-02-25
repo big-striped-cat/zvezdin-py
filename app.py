@@ -5,10 +5,11 @@ import pytz
 
 from kline import read_klines_from_csv, get_moving_window_iterator
 from logger import Logger
-from strategy import strategy_basic, is_duplicate_order, maybe_close_order, log_order_opened, log_order_closed
+from strategy import strategy_basic, is_duplicate_order, maybe_close_order, log_order_opened, log_order_closed, Trend, \
+    OrderType
 
 
-def backtest_strategy(klines_csv_path):
+def backtest_strategy(global_trend: Trend, klines_csv_path: str):
     klines = read_klines_from_csv(
         klines_csv_path,
         skip_header=True,
@@ -39,10 +40,14 @@ def backtest_strategy(klines_csv_path):
         if not order:
             continue
 
-        order_count += 1
-        order.id = order_count
+        if global_trend == Trend.DOWN and order.order_type == OrderType.LONG:
+            continue
+        if global_trend == Trend.UP and order.order_type == OrderType.SHORT:
+            continue
 
         if not last_order or not is_duplicate_order(order, last_order, levels_intersection_threshold):
+            order_count += 1
+            order.id = order_count
             log_order_opened(logger, kline, order)
             orders.append(order)
             last_order = order
@@ -61,4 +66,5 @@ def backtest_strategy(klines_csv_path):
 
 if __name__ == '__main__':
     path = 'market_data/BTCBUSD-5m-2022-02-18.csv'
-    backtest_strategy(path)
+    global_trend = Trend.DOWN
+    backtest_strategy(global_trend, path)
