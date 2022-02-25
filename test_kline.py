@@ -79,3 +79,22 @@ def test_get_moving_window_iterator():
 
     windows = list(get_moving_window_iterator(values, 5))
     assert windows == []
+
+
+def kline_factory(open_time=None, close_time=None, open=None, close=None, high=None, low=None):
+    open_time = open_time or datetime_from_str('2022-01-01 18:00')
+    close_time = close_time or datetime_from_str('2022-01-01 18:05')
+
+    open = open or Decimal()
+    close = close or Decimal()
+    high = high or Decimal()
+    low = low or Decimal()
+
+    return Kline(
+        open_time=open_time,
+        close_time=close_time,
+        open=open,
+        close=close,
+        high=high,
+        low=low
+    )

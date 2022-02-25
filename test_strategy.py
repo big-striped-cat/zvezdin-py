@@ -6,6 +6,7 @@ from kline import Kline
 from strategy import ExtrapolatedList, calc_local_maximums, calc_trend_by_extremums, Trend, calc_trend, \
     calc_levels_intersection_rate, is_duplicate_order, Order, OrderType, maybe_close_order, Trade, \
     TradeType
+from test_kline import kline_factory
 from test_utils import datetime_from_str
 
 
@@ -94,7 +95,7 @@ def test_calc_levels_intersection_rate():
     assert calc_levels_intersection_rate(level_a, level_b) == Decimal('0.5')
 
 
-def create_trade(trade_type=None, price=None, amount=None, created_at=None) -> Trade:
+def trade_factory(trade_type=None, price=None, amount=None, created_at=None) -> Trade:
     trade_type = trade_type or TradeType.BUY
     price = price or Decimal()
     amount = amount or Decimal(1)
@@ -108,34 +109,37 @@ def create_trade(trade_type=None, price=None, amount=None, created_at=None) -> T
     )
 
 
-def create_order(order_type=None, trade_open=None, trade_close=None, level=None) -> Order:
+def order_factory(order_type=None, trade_open=None, trade_close=None, level=None,
+                  price_take_profit=None, price_stop_loss=None) -> Order:
     order_type = order_type or OrderType.LONG
-    trade_open = trade_open or create_trade()
+    trade_open = trade_open or trade_factory()
     level = level or (Decimal(), Decimal())
+    price_take_profit = price_take_profit or Decimal()
+    price_stop_loss = price_stop_loss or Decimal()
 
     return Order(
         order_type=order_type,
         trade_open=trade_open,
         trade_close=trade_close,
         level=level,
-        price_take_profit=Decimal(),
-        price_stop_loss=Decimal()
+        price_take_profit=price_take_profit,
+        price_stop_loss=price_stop_loss
     )
 
 
 class TestIsDuplicateOrder:
     def test_identical_orders(self):
-        trade_open_a = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
+        trade_open_a = trade_factory(trade_type=TradeType.BUY, price=Decimal(2))
         level_a = (Decimal(1), Decimal(2))
-        order_a = create_order(
+        order_a = order_factory(
             order_type=OrderType.LONG,
             trade_open=trade_open_a,
             level=level_a
         )
 
-        trade_open_b = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
+        trade_open_b = trade_factory(trade_type=TradeType.BUY, price=Decimal(2))
         level_b = (Decimal(1), Decimal(2))
-        order_b = create_order(
+        order_b = order_factory(
             order_type=OrderType.LONG,
             trade_open=trade_open_b,
             level=level_b
@@ -145,17 +149,17 @@ class TestIsDuplicateOrder:
         assert is_duplicate_order(order_a, order_b, threshold)
 
     def test_order_different_type(self):
-        trade_open_a = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
+        trade_open_a = trade_factory(trade_type=TradeType.BUY, price=Decimal(2))
         level_a = (Decimal(1), Decimal(2))
-        order_a = create_order(
+        order_a = order_factory(
             order_type=OrderType.LONG,
             trade_open=trade_open_a,
             level=level_a
         )
 
-        trade_open_b = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
+        trade_open_b = trade_factory(trade_type=TradeType.BUY, price=Decimal(2))
         level_b = (Decimal(1), Decimal(2))
-        order_b = create_order(
+        order_b = order_factory(
             order_type=OrderType.SHORT,
             trade_open=trade_open_b,
             level=level_b
@@ -165,17 +169,17 @@ class TestIsDuplicateOrder:
         assert not is_duplicate_order(order_a, order_b, threshold)
 
     def test_orders_similar_level(self):
-        trade_open_a = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
+        trade_open_a = trade_factory(trade_type=TradeType.BUY, price=Decimal(2))
         level_a = (Decimal(1), Decimal(10))
-        order_a = create_order(
+        order_a = order_factory(
             order_type=OrderType.LONG,
             trade_open=trade_open_a,
             level=level_a
         )
 
-        trade_open_b = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
+        trade_open_b = trade_factory(trade_type=TradeType.BUY, price=Decimal(2))
         level_b = (Decimal(2), Decimal(11))
-        order_b = create_order(
+        order_b = order_factory(
             order_type=OrderType.LONG,
             trade_open=trade_open_b,
             level=level_b
@@ -185,17 +189,17 @@ class TestIsDuplicateOrder:
         assert is_duplicate_order(order_a, order_b, threshold)
 
     def test_orders_different_level(self):
-        trade_open_a = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
+        trade_open_a = trade_factory(trade_type=TradeType.BUY, price=Decimal(2))
         level_a = (Decimal(1), Decimal(3))
-        order_a = create_order(
+        order_a = order_factory(
             order_type=OrderType.LONG,
             trade_open=trade_open_a,
             level=level_a
         )
 
-        trade_open_b = create_trade(trade_type=TradeType.BUY, price=Decimal(2))
+        trade_open_b = trade_factory(trade_type=TradeType.BUY, price=Decimal(2))
         level_b = (Decimal(2), Decimal(4))
-        order_b = create_order(
+        order_b = order_factory(
             order_type=OrderType.LONG,
             trade_open=trade_open_b,
             level=level_b
@@ -207,141 +211,111 @@ class TestIsDuplicateOrder:
 
 class TestMaybeCloseOrder:
     def test_long_close_by_take_profit(self):
-        kline = Kline(
-            open_time=datetime_from_str('2022-01-01 18:00'),
-            close_time=datetime_from_str('2022-01-01 18:05'),
+        kline = kline_factory(
             open=Decimal(40),
             close=Decimal(50),
             high=Decimal(60),
             low=Decimal(30)
         )
-        trade_open = Trade(
-            type=TradeType.BUY,
-            price=Decimal(30),
-            amount=Decimal(1),
-            created_at=datetime_from_str('2022-01-01 17:50')
-        )
-        level = (Decimal(), Decimal())
-        order = Order(
+        trade_open = trade_factory(trade_type=TradeType.BUY, price=Decimal(30))
+        order = order_factory(
             order_type=OrderType.LONG,
             trade_open=trade_open,
-            trade_close=None,
-            level=level,
             price_take_profit=Decimal(55),
             price_stop_loss=Decimal(20)
         )
+        assert not order.is_closed
+        assert order.trade_close is None
+
         maybe_close_order(kline, order)
+
         assert order.is_closed
         assert order.trade_close.price == Decimal(55)
 
     def test_long_close_by_stop_loss(self):
-        kline = Kline(
-            open_time=datetime_from_str('2022-01-01 18:00'),
-            close_time=datetime_from_str('2022-01-01 18:05'),
+        kline = kline_factory(
             open=Decimal(40),
             close=Decimal(50),
             high=Decimal(60),
             low=Decimal(30)
         )
-        trade_open = Trade(
-            type=TradeType.BUY,
-            price=Decimal(70),
-            amount=Decimal(1),
-            created_at=datetime_from_str('2022-01-01 17:50')
-        )
-        level = (Decimal(), Decimal())
-        order = Order(
+        trade_open = trade_factory(trade_type=TradeType.BUY, price=Decimal(70))
+        order = order_factory(
             order_type=OrderType.LONG,
             trade_open=trade_open,
-            trade_close=None,
-            level=level,
             price_take_profit=Decimal(100),
             price_stop_loss=Decimal(35)
         )
+        assert not order.is_closed
+        assert order.trade_close is None
+
         maybe_close_order(kline, order)
+
         assert order.is_closed
         assert order.trade_close.price == Decimal(35)
 
     def test_short_close_by_take_profit(self):
-        kline = Kline(
-            open_time=datetime_from_str('2022-01-01 18:00'),
-            close_time=datetime_from_str('2022-01-01 18:05'),
+        kline = kline_factory(
             open=Decimal(40),
             close=Decimal(50),
             high=Decimal(60),
             low=Decimal(30)
         )
-        trade_open = Trade(
-            type=TradeType.SELL,
-            price=Decimal(70),
-            amount=Decimal(1),
-            created_at=datetime_from_str('2022-01-01 17:50')
-        )
-        level = (Decimal(), Decimal())
-        order = Order(
+        trade_open = trade_factory(trade_type=TradeType.SELL, price=Decimal(70))
+        order = order_factory(
             order_type=OrderType.LONG,
             trade_open=trade_open,
-            trade_close=None,
-            level=level,
             price_take_profit=Decimal(35),
             price_stop_loss=Decimal(100)
         )
+        assert not order.is_closed
+        assert order.trade_close is None
+
         maybe_close_order(kline, order)
+
         assert order.is_closed
         assert order.trade_close.price == Decimal(35)
 
     def test_short_close_by_stop_loss(self):
-        kline = Kline(
-            open_time=datetime_from_str('2022-01-01 18:00'),
-            close_time=datetime_from_str('2022-01-01 18:05'),
+        kline = kline_factory(
             open=Decimal(40),
             close=Decimal(50),
             high=Decimal(60),
             low=Decimal(30)
         )
-        trade_open = Trade(
-            type=TradeType.SELL,
-            price=Decimal(30),
-            amount=Decimal(1),
-            created_at=datetime_from_str('2022-01-01 17:50')
-        )
-        level = (Decimal(), Decimal())
-        order = Order(
+        trade_open = trade_factory(trade_type=TradeType.SELL, price=Decimal(30))
+        order = order_factory(
             order_type=OrderType.LONG,
             trade_open=trade_open,
-            trade_close=None,
-            level=level,
             price_take_profit=Decimal(55),
             price_stop_loss=Decimal(20)
         )
+        assert not order.is_closed
+        assert order.trade_close is None
+
         maybe_close_order(kline, order)
+
         assert order.is_closed
         assert order.trade_close.price == Decimal(55)
 
     def test_do_nothing(self):
-        kline = Kline(
-            open_time=datetime_from_str('2022-01-01 18:00'),
-            close_time=datetime_from_str('2022-01-01 18:05'),
+        kline = kline_factory(
             open=Decimal(40),
             close=Decimal(50),
             high=Decimal(60),
             low=Decimal(30)
         )
-        trade_open = Trade(
-            type=TradeType.BUY,
-            price=Decimal(30),
-            amount=Decimal(1),
-            created_at=datetime_from_str('2022-01-01 17:50')
-        )
-        level = (Decimal(), Decimal())
-        order = Order(
+        trade_open = trade_factory(trade_type=TradeType.BUY, price=Decimal(30))
+        order = order_factory(
             order_type=OrderType.LONG,
             trade_open=trade_open,
-            trade_close=None,
-            level=level,
             price_take_profit=Decimal(65),
             price_stop_loss=Decimal(20)
         )
+        assert not order.is_closed
+        assert order.trade_close is None
+
         maybe_close_order(kline, order)
+
         assert not order.is_closed
         assert order.trade_close is None
