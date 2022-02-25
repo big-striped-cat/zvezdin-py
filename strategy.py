@@ -4,25 +4,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import List, Tuple, Union, Optional
+from typing import List, Tuple, Union, Optional, Callable
 
 from kline import Kline
 from logger import Logger
-
-
-class ExtrapolatedList:
-    def __init__(self, values: List):
-        self._values = values
-
-    def __len__(self):
-        return len(self._values)
-
-    def __getitem__(self, item):
-        if item >= len(self._values):
-            return self._values[-1]
-        if item <= 0:
-            return self._values[0]
-        return self._values[item]
 
 
 class Trend(Enum):
@@ -36,6 +21,9 @@ def calc_trend(window: List[Decimal]) -> Trend:
     `calc_trend` is supposed to run on relatively large window, where some waves are present.
     """
     maximums = calc_local_maximums(window)
+    if len(maximums) < 2:
+        raise Exception('Lack of extremums. Probably window is too small.')
+
     return calc_trend_by_extremums(maximums)
 
 
@@ -60,14 +48,15 @@ def calc_trend_by_extremums(extremums: List[Decimal]) -> Trend:
     return Trend.FLAT
 
 
-def calc_local_maximums(window: List[Decimal], radius: int = 1) -> List[Decimal]:
-    # todo: skip endpoints ?
-    window = ExtrapolatedList(window)
+def calc_local_extremums(
+        window: List[Decimal], compare: Callable[[Decimal, Decimal], int], radius: int = 1
+) -> List[Decimal]:
     res = []
-    for i in range(len(window)):
+    # Exclude endpoints, because they can result in wrong extremums
+    for i in range(radius, len(window) - radius):
         is_extremum = True
         for j in range(i - radius, i + radius + 1):
-            if window[j] > window[i]:
+            if compare(window[j], window[i]) < 0:
                 is_extremum = False
                 break
         if is_extremum:
@@ -75,10 +64,24 @@ def calc_local_maximums(window: List[Decimal], radius: int = 1) -> List[Decimal]
     return res
 
 
+def calc_local_maximums(window: List[Decimal], radius: int = 1):
+    def compare(a, b):
+        return b - a
+
+    return calc_local_extremums(window, compare, radius=radius)
+
+
+def calc_local_minimums(window: List[Decimal], radius: int = 1):
+    def compare(a, b):
+        return a - b
+
+    return calc_local_extremums(window, compare, radius=radius)
+
+
 Level = Tuple[Decimal, Decimal]
 
 
-def calc_levels(window: List[Decimal]) -> List[Level]:
+def calc_levels_by_density(window: List[Decimal]) -> List[Level]:
     eps = Decimal(1)  # depends on asset
     value_max = max(window) + eps
     value_min = min(window)
@@ -107,6 +110,42 @@ def calc_levels(window: List[Decimal]) -> List[Level]:
         res.append((level_bottom, level_top))
 
     return res
+
+
+def calc_MA(window: List[Decimal], size: int) -> Decimal:
+    assert window
+
+    if len(window) < size:
+        num_of_missing_elements = size - len(window)
+        window = [window[0]] * num_of_missing_elements + window
+
+    res = sum((window[-1 - i] for i in range(size)), Decimal())
+    res /= size
+    return res
+
+
+def calc_MA_list(window: list[Decimal], size: int) -> list[Decimal]:
+    return [calc_MA(window[:i], size) for i in range(1, len(window) + 1)]
+
+
+def calc_levels_by_MA_extremums(window: List[Decimal]) -> List[Level]:
+    ma_size = 3
+    radius = 20  # depends on asset, 50 for BTC
+    ma_list = calc_MA_list(window, ma_size)
+
+    # do not use plain max(), because endpoints should be eliminated
+    # Also extremums allow detecting other levels
+    maximums = calc_local_maximums(ma_list)
+    minimums = calc_local_minimums(ma_list)
+    ma_max = round(max(maximums), 0)  # precision depends on asset
+    ma_min = round(min(minimums), 0)
+    level_max = (ma_max - radius, ma_max + radius)
+    level_min = (ma_min - radius, ma_min + radius)
+
+    print(f'level_min {level_min}')
+    print(f'level_max {level_max}')
+
+    return [level_min, level_max]
 
 
 def get_highest_level(levels: List[Level]) -> Level:
@@ -370,7 +409,9 @@ def create_order_short(kline: Kline, level: Level, logger: Logger) -> Order:
     )
 
 
-def strategy_basic(klines: List[Kline], logger: Logger) -> Optional[Order]:
+def strategy_basic(
+        klines: List[Kline], calc_levels: Callable[[list[Decimal]], list[Level]], logger: Logger
+) -> Optional[Order]:
     kline = klines[-1]
     window = [k.close for k in klines]
     point = window[-1]
@@ -382,13 +423,14 @@ def strategy_basic(klines: List[Kline], logger: Logger) -> Optional[Order]:
     interactions_highest = calc_level_interactions(window, level_highest)
     interactions_lowest = calc_level_interactions(window, level_lowest)
 
-    if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level_highest) == Location.UP \
-            and calc_touch_ups(interactions_highest) >= 1:
-        return create_order_long(kline, level_highest, logger)
+    for level in (level_lowest, level_highest):
+        if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level) == Location.UP \
+                and calc_touch_ups(interactions_highest) >= 1:
+            return create_order_long(kline, level, logger)
 
-    if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level_lowest) == Location.DOWN \
-            and calc_touch_downs(interactions_lowest) >= 1:
-        return create_order_short(kline, level_lowest, logger)
+        if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level) == Location.DOWN \
+                and calc_touch_downs(interactions_lowest) >= 1:
+            return create_order_short(kline, level, logger)
 
 
 def calc_levels_intersection_rate(level_a, level_b) -> Decimal:

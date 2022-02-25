@@ -1,42 +1,93 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import List
+from typing import List, Callable
 
-from kline import Kline
-from strategy import ExtrapolatedList, calc_local_maximums, calc_trend_by_extremums, Trend, calc_trend, \
+from _datetime import timedelta
+
+from kline import Kline, read_klines_from_csv
+from strategy import calc_local_maximums, calc_trend_by_extremums, Trend, calc_trend, \
     calc_levels_intersection_rate, is_duplicate_order, Order, OrderType, maybe_close_order, Trade, \
-    TradeType
+    TradeType, Level, get_highest_level, get_lowest_level, calc_levels_by_MA_extremums, calc_MA_list, \
+    calc_levels_by_density, calc_local_minimums
 from test_kline import kline_factory
 from test_utils import datetime_from_str
 
 
-def test_extrapolated_list():
-    x = ExtrapolatedList([5])
-    assert x[-2] == 5
-    assert x[-1] == 5
-    assert x[0] == 5
-    assert x[1] == 5
-    assert x[2] == 5
+def _test_calc_levels(
+        calc_levels: Callable[[list[Decimal]], list[Level]],
+        klines_csv_path: str,
+        date_from: datetime,
+        date_to: datetime,
+        level_low_expected: Level,
+        level_high_expected: Level,
+):
 
-    x = ExtrapolatedList([5, 6])
-    assert x[-2] == 5
-    assert x[-1] == 5
-    assert x[0] == 5
-    assert x[1] == 6
-    assert x[2] == 6
-    assert x[3] == 6
+    klines = read_klines_from_csv(klines_csv_path, skip_header=True, timeframe=timedelta(minutes=5))
+
+    klines_from_to = [k for k in klines if date_from <= k.open_time <= date_to]
+    window = [k.close for k in klines_from_to]
+    levels = calc_levels(window)
+    level_low = get_lowest_level(levels)
+    level_high = get_highest_level(levels)
+
+    assert level_high[0] >= level_high_expected[0]
+    assert level_high[1] <= level_high_expected[1]
+
+    assert level_low[0] >= level_low_expected[0]
+    assert level_low[1] <= level_low_expected[1]
+
+
+def test_calc_MA_list():
+    size = 3
+
+    window = [Decimal(3)]
+    assert calc_MA_list(window, size) == [Decimal(3)]
+
+    window = [Decimal(3), Decimal(6)]
+    assert calc_MA_list(window, size) == [Decimal(3), Decimal(4)]
+
+    window = [Decimal(3), Decimal(6), Decimal(9)]
+    assert calc_MA_list(window, size) == [Decimal(3), Decimal(4), Decimal(6)]
+
+    window = [Decimal(3), Decimal(6), Decimal(9), Decimal(9)]
+    assert calc_MA_list(window, size) == [Decimal(3), Decimal(4), Decimal(6), Decimal(8)]
+
+
+def test_calc_levels_by_MA_extremums():
+    klines_csv_path = 'market_data/BTCBUSD-5m-2022-02-18.csv'
+    calc_levels = calc_levels_by_MA_extremums
+    # calc_levels = calc_levels_by_density
+
+    date_from = datetime_from_str('2022-02-18 11:20')  # UTC
+    date_to = datetime_from_str('2022-02-18 14:30')  # UTC
+    level_low_expected = (Decimal(40160), Decimal(40330))
+    level_high_expected = (Decimal(40400), Decimal(40550))
+
+    _test_calc_levels(calc_levels, klines_csv_path, date_from, date_to, level_low_expected, level_high_expected)
 
 
 def test_calc_local_maximums():
     def calc_local_maximums_int(window: List[int], radius: int = 1):
         return calc_local_maximums([Decimal(x) for x in window], radius=radius)
 
-    assert calc_local_maximums_int([1]) == [1]
-    assert calc_local_maximums_int([1, 2]) == [2]
-    assert calc_local_maximums_int([1, 2, 3]) == [3]
+    assert calc_local_maximums_int([1]) == []
+    assert calc_local_maximums_int([1, 2]) == []
+    assert calc_local_maximums_int([1, 2, 3]) == []
     assert calc_local_maximums_int([1, 3, 2]) == [3]
     assert calc_local_maximums_int([1, 3, 2, 4, 3]) == [3, 4]
     assert calc_local_maximums_int([1, 3, 2, 4, 5, 3]) == [3, 5]
+
+
+def test_calc_local_minimums():
+    def calc_local_minimums_int(window: List[int], radius: int = 1):
+        return calc_local_minimums([Decimal(x) for x in window], radius=radius)
+
+    assert calc_local_minimums_int([9]) == []
+    assert calc_local_minimums_int([9, 8]) == []
+    assert calc_local_minimums_int([9, 8, 7]) == []
+    assert calc_local_minimums_int([9, 7, 8]) == [7]
+    assert calc_local_minimums_int([9, 7, 8, 6, 7]) == [7, 6]
+    assert calc_local_minimums_int([9, 7, 8, 6, 5, 7]) == [7, 5]
 
 
 def test_calc_trend_by_extremums():
@@ -62,19 +113,10 @@ def test_calc_trend():
     def calc_trend_int(window: List[int]):
         return calc_trend([Decimal(x) for x in window])
 
-    assert calc_trend_int([5, 6, 7]) == Trend.FLAT
-    assert calc_trend_int([5, 6, 7, 8]) == Trend.FLAT
-    assert calc_trend_int([5, 7, 6, 8]) == Trend.UP
-    assert calc_trend_int([5, 8, 7, 8]) == Trend.FLAT
-    assert calc_trend_int([5, 9, 7, 8]) == Trend.DOWN
-
-    assert calc_trend_int([7, 6, 5]) == Trend.FLAT
-    assert calc_trend_int([8, 7, 6, 5]) == Trend.FLAT
-    assert calc_trend_int([8, 6, 7, 5]) == Trend.DOWN
-    assert calc_trend_int([8, 7, 8, 5]) == Trend.FLAT
-    assert calc_trend_int([8, 7, 9, 5]) == Trend.UP
-
-    assert calc_trend_int([7, 6, 5, 6]) == Trend.DOWN
+    assert calc_trend_int([5, 7, 8, 7, 8, 7]) == Trend.FLAT
+    assert calc_trend_int([5, 7, 6, 8, 7, 9]) == Trend.UP
+    assert calc_trend_int([5, 8, 7, 8, 7]) == Trend.FLAT
+    assert calc_trend_int([5, 9, 7, 8, 7]) == Trend.DOWN
 
 
 def test_calc_levels_intersection_rate():
@@ -118,6 +160,7 @@ def order_factory(order_type=None, trade_open=None, trade_close=None, level=None
     price_stop_loss = price_stop_loss or Decimal()
 
     return Order(
+        id=0,
         order_type=order_type,
         trade_open=trade_open,
         trade_close=trade_close,

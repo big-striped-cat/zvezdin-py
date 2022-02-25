@@ -6,7 +6,7 @@ import pytz
 from kline import read_klines_from_csv, get_moving_window_iterator
 from logger import Logger
 from strategy import strategy_basic, is_duplicate_order, maybe_close_order, log_order_opened, log_order_closed, Trend, \
-    OrderType
+    OrderType, calc_levels_by_density, calc_levels_by_MA_extremums
 
 
 def backtest_strategy(global_trend: Trend, klines_csv_path: str):
@@ -15,9 +15,10 @@ def backtest_strategy(global_trend: Trend, klines_csv_path: str):
         skip_header=True,
         timeframe=timedelta(minutes=5)
     )
-    kline_window_size = 50
+    kline_window_size = 30
 
     strategy = strategy_basic
+    calc_levels = calc_levels_by_MA_extremums
     orders = []
     orders_closed = []
     logger = Logger(tz=pytz.timezone('Europe/Moscow'))
@@ -36,7 +37,7 @@ def backtest_strategy(global_trend: Trend, klines_csv_path: str):
         if any(d.is_closed for d in orders):
             orders = [d for d in orders if not d.is_closed]
 
-        order = strategy(kline_window, logger)
+        order = strategy(kline_window, calc_levels, logger)
         if not order:
             continue
 
