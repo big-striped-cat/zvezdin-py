@@ -14,3 +14,6 @@ class Logger:
 
     def log(self, s: str):
         print(s)
+
+    def debug(self, s: str):
+        pass

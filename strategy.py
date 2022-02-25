@@ -247,6 +247,7 @@ class Trade:
 
 @dataclass
 class Order:
+    id: int
     order_type: OrderType
     trade_open: Trade
     trade_close: Optional[Trade]
@@ -254,12 +255,22 @@ class Order:
     price_take_profit: Decimal
     price_stop_loss: Decimal
 
-    def get_profit(self):
-        profit = self.trade_close.value() - self.trade_open.value()
+    def get_profit(self, trade_close: Optional[Trade] = None):
+        trade_close = trade_close or self.trade_close
+        profit = trade_close.value() - self.trade_open.value()
         return {
             OrderType.LONG: profit,
             OrderType.SHORT: -profit,
         }[self.order_type]
+
+    def get_profit_unrealized(self, kline: Kline):
+        trade_close = Trade(
+            type=get_trade_close_type(self.order_type),
+            price=kline.close,
+            amount=self.trade_open.amount,
+            created_at=kline.close_time
+        )
+        return self.get_profit(trade_close=trade_close)
 
     def is_profit(self):
         return self.get_profit() > 0
@@ -267,6 +278,19 @@ class Order:
     @property
     def is_closed(self):
         return self.trade_close is not None
+
+
+def log_order_opened(logger: Logger, kline: Kline, order: Order):
+    close_time_str = logger.format_datetime(kline.close_time)
+    level_str = f'Level[{order.level[0]}, {order.level[1]}]'
+    logger.log(f'Order opened id={order.id} {order.order_type} {close_time_str} on {level_str}, '
+               f'take profit {order.price_take_profit}, stop loss {order.price_stop_loss}')
+
+
+def log_order_closed(logger: Logger, kline: Kline, order: Order):
+    close_time_str = logger.format_datetime(kline.close_time)
+    logger.log(f'Order closed id={order.id} {order.order_type} {close_time_str} by price {order.trade_close.price}, '
+               f'with profit/loss {order.get_profit()}')
 
 
 def get_trade_open_type(order_type: OrderType) -> TradeType:
@@ -283,10 +307,18 @@ def get_trade_close_type(order_type: OrderType) -> TradeType:
     }[order_type]
 
 
-def create_order(order_type: OrderType, kline: Kline, level: Level, logger: Logger) -> Order:
+def create_order(
+        order_type: OrderType, kline: Kline, level: Level, logger: Logger,
+        price_take_profit=None, price_stop_loss=None, id=None
+        ) -> Order:
+    price_take_profit = price_take_profit or Decimal()
+    price_stop_loss = price_stop_loss or Decimal()
+    id = id or 0
+
     close_time_str = logger.format_datetime(kline.close_time)
     level_str = f'Level[{level[0]}, {level[1]}]'
-    logger.log(f'create order {order_type} {close_time_str} on {level_str}')
+    logger.debug(f'create order {order_type} {close_time_str} on {level_str}, '
+                 f'take profit {price_take_profit}, stop loss {price_stop_loss}')
 
     trade_type = get_trade_open_type(order_type)
 
@@ -296,22 +328,46 @@ def create_order(order_type: OrderType, kline: Kline, level: Level, logger: Logg
         amount=Decimal(1),
         created_at=kline.close_time
     )
+
     return Order(
+        id=id,
         order_type=order_type,
         trade_open=trade_open,
         trade_close=None,
         level=level,
-        price_take_profit=kline.close,
-        price_stop_loss=kline.close,
+        price_take_profit=price_take_profit,
+        price_stop_loss=price_stop_loss,
     )
 
 
+def add_percent(d: Decimal, percent: Union[int, Decimal]) -> Decimal:
+    if not isinstance(percent, Decimal):
+        percent = Decimal(percent)
+
+    res = d * (1 + Decimal('0.01') * percent)
+    return Decimal(round(res))
+
+
 def create_order_long(kline: Kline, level: Level, logger: Logger) -> Order:
-    return create_order(OrderType.LONG, kline, level, logger)
+    price_take_profit = add_percent(kline.close, 2)
+    price_stop_loss = add_percent(kline.close, -1)
+
+    return create_order(
+        OrderType.LONG, kline, level, logger,
+        price_take_profit=price_take_profit,
+        price_stop_loss=price_stop_loss
+    )
 
 
 def create_order_short(kline: Kline, level: Level, logger: Logger) -> Order:
-    return create_order(OrderType.SHORT, kline, level, logger)
+    price_take_profit = add_percent(kline.close, -2)
+    price_stop_loss = add_percent(kline.close, 1)
+
+    return create_order(
+        OrderType.SHORT, kline, level, logger,
+        price_take_profit=price_take_profit,
+        price_stop_loss=price_stop_loss
+    )
 
 
 def strategy_basic(klines: List[Kline], logger: Logger) -> Optional[Order]:

@@ -1,11 +1,8 @@
 
 def get_logger() - хранит синглетон логгера в замыкании
 
-
-переименовать Decision -> Order
-
 close_order_by_xxx - возвращать новый ордер вместо мутирования старого
 
 для всех ценников использовать тип Price = Union[int, Decimal]
 
-фабрики в тестах
+обработка ситуации , когда на свечке Take profit and stop loss both achieved 
