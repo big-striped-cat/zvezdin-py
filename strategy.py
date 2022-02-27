@@ -20,7 +20,7 @@ def calc_trend(window: List[Decimal]) -> Trend:
     """
     `calc_trend` is supposed to run on relatively large window, where some waves are present.
     """
-    maximums = calc_local_maximums(window)
+    _, maximums = calc_local_maximums(window)
     if len(maximums) < 2:
         raise Exception('Lack of extremums. Probably window is too small.')
 
@@ -50,8 +50,8 @@ def calc_trend_by_extremums(extremums: List[Decimal]) -> Trend:
 
 def calc_local_extremums(
         window: List[Decimal], compare: Callable[[Decimal, Decimal], int], radius: int = 1
-) -> List[Decimal]:
-    res = []
+) -> tuple[list[int], list[Decimal]]:
+    indices = []
     # Exclude endpoints, because they can result in wrong extremums
     for i in range(radius, len(window) - radius):
         is_extremum = True
@@ -60,18 +60,20 @@ def calc_local_extremums(
                 is_extremum = False
                 break
         if is_extremum:
-            res.append(window[i])
-    return res
+            indices.append(i)
+
+    extremums = [window[i] for i in indices]
+    return indices, extremums
 
 
-def calc_local_maximums(window: List[Decimal], radius: int = 1):
+def calc_local_maximums(window: List[Decimal], radius: int = 1) -> tuple[list[int], list[Decimal]]:
     def compare(a, b):
         return b - a
 
     return calc_local_extremums(window, compare, radius=radius)
 
 
-def calc_local_minimums(window: List[Decimal], radius: int = 1):
+def calc_local_minimums(window: List[Decimal], radius: int = 1) -> tuple[list[int], list[Decimal]]:
     def compare(a, b):
         return a - b
 
@@ -128,21 +130,27 @@ def calc_MA_list(window: list[Decimal], size: int) -> list[Decimal]:
     return [calc_MA(window[:i], size) for i in range(1, len(window) + 1)]
 
 
-def calc_levels_by_MA_extremums(window: List[Decimal]) -> List[Level]:
+def calc_levels_by_MA_extremums(klines: List[Kline]) -> List[Level]:
     ma_size = 3
     radius = 20  # depends on asset, 50 for BTC
+    window = [k.close for k in klines]
     ma_list = calc_MA_list(window, ma_size)
 
     # do not use plain max(), because endpoints should be eliminated
     # Also extremums allow detecting other levels
-    maximums = calc_local_maximums(ma_list)
-    minimums = calc_local_minimums(ma_list)
+    indices_max, maximums = calc_local_maximums(ma_list)
+    print('klines max')
+    for i in indices_max:
+        print(f'{klines[i].open_time} {round(ma_list[i])}')
+    indices_min, minimums = calc_local_minimums(ma_list)
     ma_max = round(max(maximums), 0)  # precision depends on asset
     ma_min = round(min(minimums), 0)
+
+    print(f'ma_max {ma_max}')
     level_max = (ma_max - radius, ma_max + radius)
     level_min = (ma_min - radius, ma_min + radius)
 
-    print(f'level_min {level_min}')
+    # print(f'level_min {level_min}')
     print(f'level_max {level_max}')
 
     return [level_min, level_max]
@@ -410,26 +418,25 @@ def create_order_short(kline: Kline, level: Level, logger: Logger) -> Order:
 
 
 def strategy_basic(
-        klines: List[Kline], calc_levels: Callable[[list[Decimal]], list[Level]], logger: Logger
+        klines: List[Kline], calc_levels: Callable[[list[Kline]], list[Level]], logger: Logger
 ) -> Optional[Order]:
     kline = klines[-1]
     window = [k.close for k in klines]
     point = window[-1]
     trend = calc_trend(window)
-    levels = calc_levels(window)
+    levels = calc_levels(klines)
     level_highest = get_highest_level(levels)
     level_lowest = get_lowest_level(levels)
 
-    interactions_highest = calc_level_interactions(window, level_highest)
-    interactions_lowest = calc_level_interactions(window, level_lowest)
-
     for level in (level_lowest, level_highest):
+        interactions = calc_level_interactions(window, level)
+
         if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level) == Location.UP \
-                and calc_touch_ups(interactions_highest) >= 1:
+                and calc_touch_ups(interactions) >= 1:
             return create_order_long(kline, level, logger)
 
         if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level) == Location.DOWN \
-                and calc_touch_downs(interactions_lowest) >= 1:
+                and calc_touch_downs(interactions) >= 1:
             return create_order_short(kline, level, logger)
 
 

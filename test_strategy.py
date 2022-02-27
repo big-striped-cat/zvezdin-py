@@ -14,7 +14,7 @@ from test_utils import datetime_from_str
 
 
 def _test_calc_levels(
-        calc_levels: Callable[[list[Decimal]], list[Level]],
+        calc_levels: Callable[[list[Kline]], list[Level]],
         klines_csv_path: str,
         date_from: datetime,
         date_to: datetime,
@@ -25,8 +25,7 @@ def _test_calc_levels(
     klines = read_klines_from_csv(klines_csv_path, skip_header=True, timeframe=timedelta(minutes=5))
 
     klines_from_to = [k for k in klines if date_from <= k.open_time <= date_to]
-    window = [k.close for k in klines_from_to]
-    levels = calc_levels(window)
+    levels = calc_levels(klines_from_to)
     level_low = get_lowest_level(levels)
     level_high = get_highest_level(levels)
 
@@ -70,24 +69,24 @@ def test_calc_local_maximums():
     def calc_local_maximums_int(window: List[int], radius: int = 1):
         return calc_local_maximums([Decimal(x) for x in window], radius=radius)
 
-    assert calc_local_maximums_int([1]) == []
-    assert calc_local_maximums_int([1, 2]) == []
-    assert calc_local_maximums_int([1, 2, 3]) == []
-    assert calc_local_maximums_int([1, 3, 2]) == [3]
-    assert calc_local_maximums_int([1, 3, 2, 4, 3]) == [3, 4]
-    assert calc_local_maximums_int([1, 3, 2, 4, 5, 3]) == [3, 5]
+    assert calc_local_maximums_int([1]) == ([], [])
+    assert calc_local_maximums_int([1, 2]) == ([], [])
+    assert calc_local_maximums_int([1, 2, 3]) == ([], [])
+    assert calc_local_maximums_int([1, 3, 2]) == ([1], [3])
+    assert calc_local_maximums_int([1, 3, 2, 4, 3]) == ([1, 3], [3, 4])
+    assert calc_local_maximums_int([1, 3, 2, 4, 5, 3]) == ([1, 4], [3, 5])
 
 
 def test_calc_local_minimums():
     def calc_local_minimums_int(window: List[int], radius: int = 1):
         return calc_local_minimums([Decimal(x) for x in window], radius=radius)
 
-    assert calc_local_minimums_int([9]) == []
-    assert calc_local_minimums_int([9, 8]) == []
-    assert calc_local_minimums_int([9, 8, 7]) == []
-    assert calc_local_minimums_int([9, 7, 8]) == [7]
-    assert calc_local_minimums_int([9, 7, 8, 6, 7]) == [7, 6]
-    assert calc_local_minimums_int([9, 7, 8, 6, 5, 7]) == [7, 5]
+    assert calc_local_minimums_int([9]) == ([], [])
+    assert calc_local_minimums_int([9, 8]) == ([], [])
+    assert calc_local_minimums_int([9, 8, 7]) == ([], [])
+    assert calc_local_minimums_int([9, 7, 8]) == ([1], [7])
+    assert calc_local_minimums_int([9, 7, 8, 6, 7]) == ([1, 3], [7, 6])
+    assert calc_local_minimums_int([9, 7, 8, 6, 5, 7]) == ([1, 4], [7, 5])
 
 
 def test_calc_trend_by_extremums():
