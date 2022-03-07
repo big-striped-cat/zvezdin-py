@@ -1,7 +1,7 @@
 import enum
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import Enum
 from typing import List, Tuple, Union, Optional, Callable
@@ -139,9 +139,9 @@ def calc_levels_by_MA_extremums(klines: List[Kline]) -> List[Level]:
     # do not use plain max(), because endpoints should be eliminated
     # Also extremums allow detecting other levels
     indices_max, maximums = calc_local_maximums(ma_list)
-    print('klines max')
-    for i in indices_max:
-        print(f'{klines[i].open_time} {round(ma_list[i])}')
+    # print('klines max')
+    # for i in indices_max:
+    #     print(f'{klines[i].open_time} {round(ma_list[i])}')
     indices_min, minimums = calc_local_minimums(ma_list)
     ma_max = round(max(maximums), 0)  # precision depends on asset
     ma_min = round(min(minimums), 0)
@@ -330,13 +330,16 @@ class Order:
 def log_order_opened(logger: Logger, kline: Kline, order: Order):
     close_time_str = logger.format_datetime(kline.close_time)
     level_str = f'Level[{order.level[0]}, {order.level[1]}]'
-    logger.log(f'Order opened id={order.id} {order.order_type} {close_time_str} on {level_str}, '
-               f'take profit {order.price_take_profit}, stop loss {order.price_stop_loss}')
+    logger.log(f'Order opened id={order.id} {order.order_type} {close_time_str} on {level_str} '
+               f'by price {order.trade_open.price}, '
+               f'take profit {order.price_take_profit}, '
+               f'stop loss {order.price_stop_loss}')
 
 
 def log_order_closed(logger: Logger, kline: Kline, order: Order):
     close_time_str = logger.format_datetime(kline.close_time)
-    logger.log(f'Order closed id={order.id} {order.order_type} {close_time_str} by price {order.trade_close.price}, '
+    logger.log(f'Order closed id={order.id} {order.order_type} {close_time_str} '
+               f'by price {order.trade_close.price}, '
                f'with profit/loss {order.get_profit()}')
 
 
@@ -420,6 +423,12 @@ def create_order_short(kline: Kline, level: Level, logger: Logger) -> Order:
 def strategy_basic(
         klines: List[Kline], calc_levels: Callable[[list[Kline]], list[Level]], logger: Logger
 ) -> Optional[Order]:
+    """
+    :param klines: historical klines. Current kline open price equals to klines[-1].close
+    :param calc_levels:
+    :param logger:
+    :return:
+    """
     kline = klines[-1]
     window = [k.close for k in klines]
     point = window[-1]
@@ -459,15 +468,30 @@ def calc_levels_intersection_rate(level_a, level_b) -> Decimal:
     return 2 * common_segment / (size_a + size_b)
 
 
-def is_duplicate_order(order_a: Order, order_b: Order, level_intersection_threshold: Decimal):
+def is_duplicate_order(
+        order_a: Order, order_b: Order,
+        level_intersection_threshold: Decimal,
+        timeout: Optional[timedelta] = None
+):
     if order_a.order_type != order_b.order_type:
         return False
+
+    if timeout:
+        delta = order_a.trade_open.created_at - order_b.trade_open.created_at
+        if abs(delta.total_seconds()) < timeout.total_seconds():
+            return True
 
     levels_intersection_rate = calc_levels_intersection_rate(order_a.level, order_b.level)
     if levels_intersection_rate >= level_intersection_threshold:
         return True
 
     return False
+
+
+def is_order_late(order: Order, threshold: Decimal):
+    level_mid = (order.level[0] + order.level[1]) / 2
+    price_open_to_level_ratio = abs(order.trade_open.price - level_mid) / level_mid
+    return price_open_to_level_ratio > threshold
 
 
 def is_price_achieved(kline: Kline, price: Decimal) -> bool:

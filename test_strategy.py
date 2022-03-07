@@ -250,6 +250,29 @@ class TestIsDuplicateOrder:
         threshold = Decimal('0.8')
         assert not is_duplicate_order(order_a, order_b, threshold)
 
+    def test_timeout(self):
+        # Levels are different, but creation time is very close
+        trade_open_a = trade_factory(trade_type=TradeType.BUY, price=Decimal(2), created_at=datetime(2022, 2, 1))
+        level_a = (Decimal(1), Decimal(3))
+        order_a = order_factory(
+            order_type=OrderType.LONG,
+            trade_open=trade_open_a,
+            level=level_a
+        )
+
+        trade_open_b = trade_factory(trade_type=TradeType.BUY, price=Decimal(2), created_at=datetime(2022, 2, 1, 0, 5))
+        level_b = (Decimal(2), Decimal(4))
+        order_b = order_factory(
+            order_type=OrderType.LONG,
+            trade_open=trade_open_b,
+            level=level_b
+        )
+
+        threshold = Decimal('0.8')
+
+        assert not is_duplicate_order(order_a, order_b, threshold, timeout=timedelta(minutes=2))
+        assert is_duplicate_order(order_a, order_b, threshold, timeout=timedelta(minutes=8))
+
 
 class TestMaybeCloseOrder:
     def test_long_close_by_take_profit(self):

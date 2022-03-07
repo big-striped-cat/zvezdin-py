@@ -6,7 +6,7 @@ import pytz
 from kline import read_klines_from_csv, get_moving_window_iterator
 from logger import Logger
 from strategy import strategy_basic, is_duplicate_order, maybe_close_order, log_order_opened, log_order_closed, Trend, \
-    OrderType, calc_levels_by_density, calc_levels_by_MA_extremums
+    OrderType, calc_levels_by_density, calc_levels_by_MA_extremums, is_order_late
 
 
 def backtest_strategy(global_trend: Trend, klines_csv_path: str):
@@ -24,9 +24,14 @@ def backtest_strategy(global_trend: Trend, klines_csv_path: str):
     logger = Logger(tz=pytz.timezone('Europe/Moscow'))
     last_order = None
     levels_intersection_threshold = Decimal('0.5')
+    order_intersection_timeout = timedelta(minutes=5 * kline_window_size)
+    price_open_to_level_ratio_threshold = Decimal('0.008')
+
     order_count = 0
 
-    for kline_window in get_moving_window_iterator(klines, kline_window_size):
+    # window consists of `kline_window_size` historical klines and one current kline
+    for kline_window in get_moving_window_iterator(klines, kline_window_size + 1):
+        # current kline
         kline = kline_window[-1]
 
         for i, order in enumerate(orders):
@@ -37,7 +42,8 @@ def backtest_strategy(global_trend: Trend, klines_csv_path: str):
         if any(d.is_closed for d in orders):
             orders = [d for d in orders if not d.is_closed]
 
-        order = strategy(kline_window, calc_levels, logger)
+        # pass historical klines to strategy
+        order = strategy(kline_window[:-1], calc_levels, logger)
         if not order:
             continue
 
@@ -46,7 +52,10 @@ def backtest_strategy(global_trend: Trend, klines_csv_path: str):
         if global_trend == Trend.UP and order.order_type == OrderType.SHORT:
             continue
 
-        if not last_order or not is_duplicate_order(order, last_order, levels_intersection_threshold):
+        if not last_order or (not is_duplicate_order(
+                order, last_order, levels_intersection_threshold, timeout=order_intersection_timeout
+        ) and not is_order_late(order, price_open_to_level_ratio_threshold)
+        ):
             order_count += 1
             order.id = order_count
             log_order_opened(logger, kline, order)
