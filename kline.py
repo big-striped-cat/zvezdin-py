@@ -1,6 +1,6 @@
 import csv
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from decimal import Decimal
 from typing import Iterator, Optional
 
@@ -57,8 +57,45 @@ def read_klines_from_csv(
     return res
 
 
-def get_moving_window_iterator(values: list, size) -> Iterator[list]:
-    start = 0
-    while start + size <= len(values):
-        yield values[start: start + size]
-        start += 1
+def get_moving_window_iterator(values: Iterator, size) -> Iterator[list]:
+    window = []
+    for value in values:
+        if len(window) == size:
+            # create another list, do not mutate previous yielded list
+            window = window[:]
+
+        window.append(value)
+        if len(window) > size:
+            window.pop(0)
+
+        if len(window) < size:
+            continue
+
+        yield window
+
+
+def date_iter(date_from: date, date_to: date) -> Iterator[date]:
+    d = date_from
+    while d <= date_to:
+        yield d
+        d += timedelta(days=1)
+
+
+@dataclass
+class KlineDataRange:
+    path_template: str
+    date_from: date
+    date_to: date
+
+    def path_iter(self) -> Iterator[str]:
+        for d in date_iter(self.date_from, self.date_to):
+            yield d.strftime(self.path_template)
+
+
+def get_klines_iter(
+        path_iter: Iterator[str],
+        skip_header: bool = False,
+        timeframe: timedelta = timedelta()
+) -> Iterator[Kline]:
+    for path in path_iter:
+        yield from read_klines_from_csv(path, skip_header=skip_header, timeframe=timeframe)

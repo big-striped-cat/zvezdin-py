@@ -1,18 +1,27 @@
-from datetime import timedelta
+from dataclasses import dataclass
+from datetime import timedelta, date
 from decimal import Decimal
+from typing import Optional, Iterator
 
 import pytz
 
-from kline import read_klines_from_csv, get_moving_window_iterator
+from kline import read_klines_from_csv, get_moving_window_iterator, KlineDataRange, get_klines_iter
 from logger import Logger
 from strategy import strategy_basic, is_duplicate_order, maybe_close_order, log_order_opened, log_order_closed, Trend, \
     OrderType, calc_levels_by_density, calc_levels_by_MA_extremums, is_order_late
 
 
-def backtest_strategy(global_trend: Trend, klines_csv_path: str):
-    klines = read_klines_from_csv(
-        klines_csv_path,
-        skip_header=True,
+def backtest_strategy(
+        global_trend: Trend,
+        klines_csv_path: Optional[str] = None,
+        kline_data_range: Optional[KlineDataRange] = None
+):
+    assert klines_csv_path or kline_data_range
+    path_iter = (klines_csv_path, ) if klines_csv_path else kline_data_range.path_iter()
+
+    klines = get_klines_iter(
+        path_iter,
+        skip_header=False,
         timeframe=timedelta(minutes=5)
     )
     kline_window_size = 30
@@ -23,6 +32,8 @@ def backtest_strategy(global_trend: Trend, klines_csv_path: str):
     orders_closed = []
     logger = Logger(tz=pytz.timezone('Europe/Moscow'))
     last_order = None
+
+    # strategy config
     levels_intersection_threshold = Decimal('0.5')
     order_intersection_timeout = timedelta(minutes=5 * kline_window_size)
     price_open_to_level_ratio_threshold = Decimal('0.008')
@@ -75,6 +86,16 @@ def backtest_strategy(global_trend: Trend, klines_csv_path: str):
 
 
 if __name__ == '__main__':
-    path = 'market_data/BTCBUSD-5m-2022-02-18.csv'
+    # path = 'market_data/BTCBUSD-5m-2022-02-18.csv'
+    path_template = 'market_data/BTCBUSD-5m-%Y-%m-%d.csv'
+    date_from = date(2022, 2, 18)
+    date_to = date(2022, 2, 19)
+
+    kline_data_range = KlineDataRange(
+        path_template=path_template,
+        date_from=date_from,
+        date_to=date_to
+    )
+
     global_trend = Trend.DOWN
-    backtest_strategy(global_trend, path)
+    backtest_strategy(global_trend, kline_data_range=kline_data_range)

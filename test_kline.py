@@ -1,9 +1,9 @@
-from datetime import timedelta
+from datetime import timedelta, date
 from decimal import Decimal
 
 import pytz
 
-from kline import read_klines_from_csv, Kline, get_moving_window_iterator
+from kline import read_klines_from_csv, Kline, get_moving_window_iterator, KlineDataRange
 from test_utils import datetime_from_str
 
 
@@ -98,3 +98,38 @@ def kline_factory(open_time=None, close_time=None, open=None, close=None, high=N
         high=high,
         low=low
     )
+
+
+class TestKlineDataRange:
+    def test_path_iter_1(self):
+        kdr = KlineDataRange(
+            path_template='BTCBUSD-5m-%Y-%m-%d.csv',
+            date_from=date(2022, 2, 18),
+            date_to=date(2022, 2, 18),
+        )
+        assert list(kdr.path_iter()) == [
+            'BTCBUSD-5m-2022-02-18.csv',
+        ]
+
+    def test_path_iter_2(self):
+        kdr = KlineDataRange(
+            path_template='BTCBUSD-5m-%Y-%m-%d.csv',
+            date_from=date(2022, 2, 18),
+            date_to=date(2022, 2, 19),
+        )
+        assert list(kdr.path_iter()) == [
+            'BTCBUSD-5m-2022-02-18.csv',
+            'BTCBUSD-5m-2022-02-19.csv',
+        ]
+
+    def test_path_iter_3(self):
+        kdr = KlineDataRange(
+            path_template='BTCBUSD-5m-%Y-%m-%d.csv',
+            date_from=date(2022, 2, 18),
+            date_to=date(2022, 2, 20),
+        )
+        assert list(kdr.path_iter()) == [
+            'BTCBUSD-5m-2022-02-18.csv',
+            'BTCBUSD-5m-2022-02-19.csv',
+            'BTCBUSD-5m-2022-02-20.csv',
+        ]
