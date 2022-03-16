@@ -1,13 +1,12 @@
-import enum
 from collections import defaultdict
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 from enum import Enum
-from typing import List, Tuple, Union, Optional, Callable
+from typing import List, Union, Optional, Callable
 
 from kline import Kline
-from logger import Logger
+from level import Level
+from order import Order, create_order_long, create_order_short
 
 
 class Trend(Enum):
@@ -80,9 +79,6 @@ def calc_local_minimums(window: List[Decimal], radius: int = 1) -> tuple[list[in
     return calc_local_extremums(window, compare, radius=radius)
 
 
-Level = Tuple[Decimal, Decimal]
-
-
 def calc_levels_by_density(window: List[Decimal]) -> List[Level]:
     eps = Decimal(1)  # depends on asset
     value_max = max(window) + eps
@@ -146,12 +142,12 @@ def calc_levels_by_MA_extremums(klines: List[Kline]) -> List[Level]:
     ma_max = round(max(maximums), 0)  # precision depends on asset
     ma_min = round(min(minimums), 0)
 
-    print(f'ma_max {ma_max}')
+    # print(f'ma_max {ma_max}')
     level_max = (ma_max - radius, ma_max + radius)
     level_min = (ma_min - radius, ma_min + radius)
 
     # print(f'level_min {level_min}')
-    print(f'level_max {level_max}')
+    # print(f'level_max {level_max}')
 
     return [level_min, level_max]
 
@@ -259,169 +255,8 @@ def calc_touch_ups(interactions: List[Interaction]) -> int:
     return res
 
 
-class OrderType(enum.Enum):
-    LONG = 1
-    SHORT = 2
-
-    def __str__(self):
-        return {
-            OrderType.LONG: 'long',
-            OrderType.SHORT: 'short',
-        }[self]
-
-
-class TradeType(enum.Enum):
-    BUY = 1
-    SELL = 2
-
-    def __str__(self):
-        return {
-            TradeType.BUY: 'buy',
-            TradeType.SELL: 'sell',
-        }[self]
-
-
-@dataclass
-class Trade:
-    type: TradeType
-    price: Decimal
-    amount: Decimal
-    created_at: datetime
-
-    def value(self):
-        return self.price * self.amount
-
-
-@dataclass
-class Order:
-    id: int
-    order_type: OrderType
-    trade_open: Trade
-    trade_close: Optional[Trade]
-    level: Level
-    price_take_profit: Decimal
-    price_stop_loss: Decimal
-
-    def get_profit(self, trade_close: Optional[Trade] = None):
-        trade_close = trade_close or self.trade_close
-        profit = trade_close.value() - self.trade_open.value()
-        return {
-            OrderType.LONG: profit,
-            OrderType.SHORT: -profit,
-        }[self.order_type]
-
-    def get_profit_unrealized(self, kline: Kline):
-        trade_close = Trade(
-            type=get_trade_close_type(self.order_type),
-            price=kline.close,
-            amount=self.trade_open.amount,
-            created_at=kline.close_time
-        )
-        return self.get_profit(trade_close=trade_close)
-
-    def is_profit(self):
-        return self.get_profit() > 0
-
-    @property
-    def is_closed(self):
-        return self.trade_close is not None
-
-
-def log_order_opened(logger: Logger, kline: Kline, order: Order):
-    close_time_str = logger.format_datetime(kline.close_time)
-    level_str = f'Level[{order.level[0]}, {order.level[1]}]'
-    logger.log(f'Order opened id={order.id} {order.order_type} {close_time_str} on {level_str} '
-               f'by price {order.trade_open.price}, '
-               f'take profit {order.price_take_profit}, '
-               f'stop loss {order.price_stop_loss}')
-
-
-def log_order_closed(logger: Logger, kline: Kline, order: Order):
-    close_time_str = logger.format_datetime(kline.close_time)
-    logger.log(f'Order closed id={order.id} {order.order_type} {close_time_str} '
-               f'by price {order.trade_close.price}, '
-               f'with profit/loss {order.get_profit()}')
-
-
-def get_trade_open_type(order_type: OrderType) -> TradeType:
-    return {
-        OrderType.LONG: TradeType.BUY,
-        OrderType.SHORT: TradeType.SELL,
-    }[order_type]
-
-
-def get_trade_close_type(order_type: OrderType) -> TradeType:
-    return {
-        OrderType.LONG: TradeType.SELL,
-        OrderType.SHORT: TradeType.BUY,
-    }[order_type]
-
-
-def create_order(
-        order_type: OrderType, kline: Kline, level: Level, logger: Logger,
-        price_take_profit=None, price_stop_loss=None, id=None
-        ) -> Order:
-    price_take_profit = price_take_profit or Decimal()
-    price_stop_loss = price_stop_loss or Decimal()
-    id = id or 0
-
-    close_time_str = logger.format_datetime(kline.close_time)
-    level_str = f'Level[{level[0]}, {level[1]}]'
-    logger.debug(f'create order {order_type} {close_time_str} on {level_str}, '
-                 f'take profit {price_take_profit}, stop loss {price_stop_loss}')
-
-    trade_type = get_trade_open_type(order_type)
-
-    trade_open = Trade(
-        type=trade_type,
-        price=kline.close,
-        amount=Decimal(1),
-        created_at=kline.close_time
-    )
-
-    return Order(
-        id=id,
-        order_type=order_type,
-        trade_open=trade_open,
-        trade_close=None,
-        level=level,
-        price_take_profit=price_take_profit,
-        price_stop_loss=price_stop_loss,
-    )
-
-
-def add_percent(d: Decimal, percent: Union[int, Decimal]) -> Decimal:
-    if not isinstance(percent, Decimal):
-        percent = Decimal(percent)
-
-    res = d * (1 + Decimal('0.01') * percent)
-    return Decimal(round(res))
-
-
-def create_order_long(kline: Kline, level: Level, logger: Logger) -> Order:
-    price_take_profit = add_percent(kline.close, 2)
-    price_stop_loss = add_percent(kline.close, -1)
-
-    return create_order(
-        OrderType.LONG, kline, level, logger,
-        price_take_profit=price_take_profit,
-        price_stop_loss=price_stop_loss
-    )
-
-
-def create_order_short(kline: Kline, level: Level, logger: Logger) -> Order:
-    price_take_profit = add_percent(kline.close, -2)
-    price_stop_loss = add_percent(kline.close, 1)
-
-    return create_order(
-        OrderType.SHORT, kline, level, logger,
-        price_take_profit=price_take_profit,
-        price_stop_loss=price_stop_loss
-    )
-
-
 def strategy_basic(
-        klines: List[Kline], calc_levels: Callable[[list[Kline]], list[Level]], logger: Logger
+        klines: List[Kline], calc_levels: Callable[[list[Kline]], list[Level]]
 ) -> Optional[Order]:
     """
     :param klines: historical klines. Current kline open price equals to klines[-1].close
@@ -442,11 +277,11 @@ def strategy_basic(
 
         if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level) == Location.UP \
                 and calc_touch_ups(interactions) >= 1:
-            return create_order_long(kline, level, logger)
+            return create_order_long(kline, level)
 
         if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level) == Location.DOWN \
                 and calc_touch_downs(interactions) >= 1:
-            return create_order_short(kline, level, logger)
+            return create_order_short(kline, level)
 
 
 def calc_levels_intersection_rate(level_a, level_b) -> Decimal:
@@ -492,48 +327,3 @@ def is_order_late(order: Order, threshold: Decimal):
     level_mid = (order.level[0] + order.level[1]) / 2
     price_open_to_level_ratio = abs(order.trade_open.price - level_mid) / level_mid
     return price_open_to_level_ratio > threshold
-
-
-def is_price_achieved(kline: Kline, price: Decimal) -> bool:
-    return kline.low <= price <= kline.high
-
-
-def is_take_profit_achieved(kline: Kline, order: Order) -> bool:
-    return is_price_achieved(kline, order.price_take_profit)
-
-
-def is_stop_loss_achieved(kline: Kline, order: Order) -> bool:
-    return is_price_achieved(kline, order.price_stop_loss)
-
-
-def close_order_by_take_profit(kline: Kline, order: Order):
-    trade_type = get_trade_close_type(order.order_type)
-
-    order.trade_close = Trade(
-        type=trade_type,
-        price=order.price_take_profit,
-        amount=order.trade_open.amount,
-        created_at=kline.open_time,  # or close_time or ... ?
-    )
-
-
-def close_order_by_stop_loss(kline: Kline, order: Order):
-    trade_type = get_trade_close_type(order.order_type)
-
-    order.trade_close = Trade(
-        type=trade_type,
-        price=order.price_stop_loss,
-        amount=order.trade_open.amount,
-        created_at=kline.open_time,  # or close_time or ... ?
-    )
-
-
-def maybe_close_order(kline: Kline, order: Order):
-    if is_take_profit_achieved(kline, order) and is_stop_loss_achieved(kline, order):
-        raise Exception('Undefined behaviour. Take profit and stop loss both achieved.')
-
-    if is_take_profit_achieved(kline, order):
-        close_order_by_take_profit(kline, order)
-
-    if is_stop_loss_achieved(kline, order):
-        close_order_by_stop_loss(kline, order)

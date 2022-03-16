@@ -1,88 +1,53 @@
-from dataclasses import dataclass
-from datetime import timedelta, date
-from decimal import Decimal
-from typing import Optional, Iterator
+import logging
+from datetime import date
 
-import pytz
+from broker import Broker, BrokerSimulator, KlineDataRange
+from kline import get_moving_window_iterator
+from ordermanager import OrderManager
+from strategy import strategy_basic, Trend, \
+    calc_levels_by_MA_extremums
 
-from kline import read_klines_from_csv, get_moving_window_iterator, KlineDataRange, get_klines_iter
-from logger import Logger
-from strategy import strategy_basic, is_duplicate_order, maybe_close_order, log_order_opened, log_order_closed, Trend, \
-    OrderType, calc_levels_by_density, calc_levels_by_MA_extremums, is_order_late
+logger = logging.getLogger(__name__)
 
 
 def backtest_strategy(
         global_trend: Trend,
-        klines_csv_path: Optional[str] = None,
-        kline_data_range: Optional[KlineDataRange] = None
+        broker: Broker
 ):
-    assert klines_csv_path or kline_data_range
-    path_iter = (klines_csv_path, ) if klines_csv_path else kline_data_range.path_iter()
-
-    klines = get_klines_iter(
-        path_iter,
-        skip_header=False,
-        timeframe=timedelta(minutes=5)
-    )
     kline_window_size = 30
 
     strategy = strategy_basic
     calc_levels = calc_levels_by_MA_extremums
-    orders = []
-    orders_closed = []
-    logger = Logger(tz=pytz.timezone('Europe/Moscow'))
-    last_order = None
 
-    # strategy config
-    levels_intersection_threshold = Decimal('0.5')
-    order_intersection_timeout = timedelta(minutes=5 * kline_window_size)
-    price_open_to_level_ratio_threshold = Decimal('0.008')
+    order_manager = OrderManager(global_trend=global_trend)
 
-    order_count = 0
+    kline_window = []
 
     # window consists of `kline_window_size` historical klines and one current kline
-    for kline_window in get_moving_window_iterator(klines, kline_window_size + 1):
+    for kline_window in get_moving_window_iterator(broker.klines(), kline_window_size + 1):
         # current kline
         kline = kline_window[-1]
 
-        for i, order in enumerate(orders):
-            maybe_close_order(kline, order)
-            if order.is_closed:
-                log_order_closed(logger, kline, order)
-                orders_closed.append(order)
-        if any(d.is_closed for d in orders):
-            orders = [d for d in orders if not d.is_closed]
+        for event in broker.events(kline):
+            order_manager.handle_broker_event(event)
 
         # pass historical klines to strategy
-        order = strategy(kline_window[:-1], calc_levels, logger)
+        order = strategy(kline_window[:-1], calc_levels)
         if not order:
             continue
 
-        if global_trend == Trend.DOWN and order.order_type == OrderType.LONG:
-            continue
-        if global_trend == Trend.UP and order.order_type == OrderType.SHORT:
-            continue
+        if order_manager.is_order_acceptable(order):
+            event = broker.add_order(order)
+            order_manager.add_order(event.order_id, order)
 
-        if not last_order or (not is_duplicate_order(
-                order, last_order, levels_intersection_threshold, timeout=order_intersection_timeout
-        ) and not is_order_late(order, price_open_to_level_ratio_threshold)
-        ):
-            order_count += 1
-            order.id = order_count
-            log_order_opened(logger, kline, order)
-            orders.append(order)
-            last_order = order
-        else:
-            logger.debug('Duplicate order. Skip.')
+    assert kline_window, 'Not enough klines'
+    last_price = kline_window[-1].close
 
-    profit_unrealized = sum((o.get_profit_unrealized(kline) for o in orders), Decimal())
-    profit_closed = sum((o.get_profit() for o in orders_closed), Decimal())
+    logger.info(f'total orders open: {len(order_manager.orders_open)}')
+    logger.info(f'total orders closed: {len(order_manager.orders_closed)}')
 
-    logger.log(f'total orders open: {len(orders)}')
-    logger.log(f'total orders closed: {len(orders_closed)}')
-
-    logger.log(f'profit/loss on closed orders: {profit_closed}')
-    logger.log(f'profit/loss on open orders: {profit_unrealized}')
+    logger.info(f'profit/loss on closed orders: {order_manager.profit()}')
+    logger.info(f'profit/loss on open orders: {order_manager.profit_unrealized(last_price)}')
 
 
 if __name__ == '__main__':
@@ -96,6 +61,8 @@ if __name__ == '__main__':
         date_from=date_from,
         date_to=date_to
     )
+    broker = BrokerSimulator(kline_data_range=kline_data_range)
 
     global_trend = Trend.DOWN
-    backtest_strategy(global_trend, kline_data_range=kline_data_range)
+
+    backtest_strategy(global_trend, broker)

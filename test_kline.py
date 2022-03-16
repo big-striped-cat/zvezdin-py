@@ -3,7 +3,8 @@ from decimal import Decimal
 
 import pytz
 
-from kline import read_klines_from_csv, Kline, get_moving_window_iterator, KlineDataRange
+from broker import KlineDataRange, read_klines_from_csv
+from kline import Kline, get_moving_window_iterator
 from test_utils import datetime_from_str
 
 
