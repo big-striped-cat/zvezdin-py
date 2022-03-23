@@ -13,8 +13,9 @@ from order import Order, OrderId
 
 class BrokerEventType(enum.Enum):
     order_open = 1
-    order_close_by_take_profit = 2
-    order_close_by_stop_loss = 3
+    order_close = 2
+    order_close_by_take_profit = 3
+    order_close_by_stop_loss = 4
 
 
 @dataclass
@@ -22,6 +23,7 @@ class BrokerEvent:
     order_id: OrderId
     type: BrokerEventType
     created_at: datetime
+    price: Decimal
 
 
 class Broker:
@@ -32,6 +34,9 @@ class Broker:
         raise NotImplemented
 
     def events(self, kline) -> list[BrokerEvent]:
+        raise NotImplemented
+
+    def close_order(self, order_id: OrderId, kline: Kline) -> BrokerEvent:
         raise NotImplemented
 
 
@@ -64,14 +69,15 @@ class BrokerSimulator(Broker):
         return BrokerEvent(
             order_id=order_id,
             type=BrokerEventType.order_open,
-            created_at=order.trade_open.created_at
+            created_at=order.trade_open.created_at,
+            price=order.trade_open.price
         )
 
     def events(self, kline) -> list[BrokerEvent]:
         events = []
 
-        for order_id, order in self.orders.items():
-            if event := self.maybe_close_order(kline, order_id, order):
+        for order_id in self.orders.keys():
+            if event := self.wait_for_order_event(kline, order_id):
                 events.append(event)
 
         for event in events:
@@ -83,7 +89,9 @@ class BrokerSimulator(Broker):
 
         return events
 
-    def maybe_close_order(self, kline: Kline, order_id: OrderId, order: Order) -> BrokerEvent:
+    def wait_for_order_event(self, kline: Kline, order_id: OrderId) -> Optional[BrokerEvent]:
+        order = self.orders[order_id]
+
         if is_take_profit_achieved(kline, order) and is_stop_loss_achieved(kline, order):
             raise Exception('Undefined behaviour. Take profit and stop loss both achieved.')
 
@@ -91,16 +99,27 @@ class BrokerSimulator(Broker):
             return BrokerEvent(
                 order_id=order_id,
                 type=BrokerEventType.order_close_by_take_profit,
-                created_at=kline.open_time
+                created_at=kline.open_time,
+                price=order.price_take_profit
             )
 
         if is_stop_loss_achieved(kline, order):
             return BrokerEvent(
                 order_id=order_id,
                 type=BrokerEventType.order_close_by_stop_loss,
-                created_at=kline.open_time
+                created_at=kline.open_time,
+                price=order.price_stop_loss
             )
-            # close_order_by_stop_loss(kline, order)
+
+    def close_order(self, order_id: OrderId, kline: Kline) -> BrokerEvent:
+        self.orders.pop(order_id)
+
+        return BrokerEvent(
+            order_id=order_id,
+            type=BrokerEventType.order_close,
+            created_at=kline.open_time,
+            price=kline.open
+        )
 
 
 @dataclass

@@ -31,7 +31,8 @@ class TestBrokerSimulatorEvents:
             BrokerEvent(
                 order_id=order_id,
                 type=BrokerEventType.order_close_by_take_profit,
-                created_at=kline.open_time
+                created_at=kline.open_time,
+                price=Decimal(55)
             )
         ]
 
@@ -60,7 +61,8 @@ class TestBrokerSimulatorEvents:
             BrokerEvent(
                 order_id=order_id,
                 type=BrokerEventType.order_close_by_stop_loss,
-                created_at=kline.open_time
+                created_at=kline.open_time,
+                price=Decimal(35)
             )
         ]
 
@@ -89,7 +91,8 @@ class TestBrokerSimulatorEvents:
             BrokerEvent(
                 order_id=order_id,
                 type=BrokerEventType.order_close_by_take_profit,
-                created_at=kline.open_time
+                created_at=kline.open_time,
+                price=Decimal(35)
             )
         ]
 
@@ -118,7 +121,8 @@ class TestBrokerSimulatorEvents:
             BrokerEvent(
                 order_id=order_id,
                 type=BrokerEventType.order_close_by_stop_loss,
-                created_at=kline.open_time
+                created_at=kline.open_time,
+                price=Decimal(55)
             )
         ]
 

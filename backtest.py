@@ -1,4 +1,6 @@
 import logging
+logging.basicConfig(level=logging.INFO)
+
 from datetime import date
 
 from broker import Broker, BrokerSimulator, KlineDataRange
@@ -27,6 +29,12 @@ def backtest_strategy(
     for kline_window in get_moving_window_iterator(broker.klines(), kline_window_size + 1):
         # current kline
         kline = kline_window[-1]
+
+        for order_id in order_manager.find_orders_for_auto_close(kline.open_time):
+            event = broker.close_order(order_id, kline)
+
+            logger.info('Order id=%s will be auto closed', order_id)
+            order_manager.handle_broker_event(event)
 
         for event in broker.events(kline):
             order_manager.handle_broker_event(event)

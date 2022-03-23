@@ -5,6 +5,8 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional, Union
 
+from _datetime import timedelta
+
 from kline import Kline
 from level import Level
 from utils import format_datetime
@@ -53,6 +55,7 @@ class Order:
     level: Level
     price_take_profit: Decimal
     price_stop_loss: Decimal
+    auto_close_in: Optional[timedelta]
 
     def get_profit(self, trade_close: Optional[Trade] = None):
         trade_close = trade_close or self.trade_close
@@ -95,7 +98,7 @@ def get_trade_close_type(order_type: OrderType) -> TradeType:
 
 def create_order(
         order_type: OrderType, kline: Kline, level: Level,
-        price_take_profit=None, price_stop_loss=None,
+        price_take_profit=None, price_stop_loss=None, auto_close_in=None
         ) -> Order:
     price_take_profit = price_take_profit or Decimal()
     price_stop_loss = price_stop_loss or Decimal()
@@ -116,6 +119,7 @@ def create_order(
         level=level,
         price_take_profit=price_take_profit,
         price_stop_loss=price_stop_loss,
+        auto_close_in=auto_close_in
     )
 
 
@@ -132,9 +136,10 @@ def create_order_long(kline: Kline, level: Level) -> Order:
     price_stop_loss = add_percent(kline.close, -1)
 
     return create_order(
-        OrderType.LONG, kline, level, logger,
+        OrderType.LONG, kline, level,
         price_take_profit=price_take_profit,
-        price_stop_loss=price_stop_loss
+        price_stop_loss=price_stop_loss,
+        auto_close_in=timedelta(hours=8)
     )
 
 
@@ -143,9 +148,10 @@ def create_order_short(kline: Kline, level: Level) -> Order:
     price_stop_loss = add_percent(kline.close, 1)
 
     return create_order(
-        OrderType.SHORT, kline, level, logger,
+        OrderType.SHORT, kline, level,
         price_take_profit=price_take_profit,
-        price_stop_loss=price_stop_loss
+        price_stop_loss=price_stop_loss,
+        auto_close_in=timedelta(hours=8)
     )
 
 

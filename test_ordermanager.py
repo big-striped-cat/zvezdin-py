@@ -8,7 +8,8 @@ from test_strategy import trade_factory, order_factory
 
 
 def broker_event_factory(
-        order_id: OrderId = None, event_type: BrokerEventType = None, created_at: datetime = None
+        order_id: OrderId = None, event_type: BrokerEventType = None, created_at: datetime = None,
+        price: Decimal = Decimal(0)
 ) -> BrokerEvent:
     order_id = order_id or 1
     event_type = event_type or BrokerEventType.order_open
@@ -17,7 +18,8 @@ def broker_event_factory(
     return BrokerEvent(
         order_id=order_id,
         type=event_type,
-        created_at=created_at
+        created_at=created_at,
+        price=price
     )
 
 
@@ -34,7 +36,10 @@ class TestOrderManager:
         order_id = 1
         order_manager.add_order(order_id, order)
 
-        event = broker_event_factory(event_type=BrokerEventType.order_close_by_take_profit)
+        event = broker_event_factory(
+            event_type=BrokerEventType.order_close_by_take_profit,
+            price=Decimal(55)
+        )
         order_manager.handle_broker_event(event)
 
         assert order.is_closed
@@ -52,7 +57,10 @@ class TestOrderManager:
         order_id = 1
         order_manager.add_order(order_id, order)
 
-        event = broker_event_factory(event_type=BrokerEventType.order_close_by_stop_loss)
+        event = broker_event_factory(
+            event_type=BrokerEventType.order_close_by_stop_loss,
+            price=Decimal(35)
+        )
         order_manager.handle_broker_event(event)
 
         assert order.is_closed
@@ -71,7 +79,11 @@ class TestOrderManager:
         order_id = 1
         order_manager.add_order(order_id, order)
 
-        event = broker_event_factory(event_type=BrokerEventType.order_close_by_take_profit)
+        event = broker_event_factory(
+            event_type=BrokerEventType.order_close_by_take_profit,
+            price=Decimal(35)
+        )
+
         order_manager.handle_broker_event(event)
 
         assert order.is_closed
@@ -90,7 +102,10 @@ class TestOrderManager:
         order_id = 1
         order_manager.add_order(order_id, order)
 
-        event = broker_event_factory(event_type=BrokerEventType.order_close_by_stop_loss)
+        event = broker_event_factory(
+            event_type=BrokerEventType.order_close_by_stop_loss,
+            price=Decimal(55)
+        )
         order_manager.handle_broker_event(event)
 
         assert order.is_closed

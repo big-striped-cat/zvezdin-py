@@ -1,6 +1,6 @@
 from datetime import timedelta, datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, List
 
 from broker import BrokerEvent, BrokerEventType, Broker
 from order import OrderId, Order, OrderType, get_trade_close_type, Trade
@@ -24,13 +24,13 @@ class OrderManager:
         self.global_trend = global_trend
 
     def is_order_acceptable(self, order: Order):
-        if not self.last_order:
-            return True
-
         if self.global_trend == Trend.DOWN and order.order_type == OrderType.LONG:
             return False
         if self.global_trend == Trend.UP and order.order_type == OrderType.SHORT:
             return False
+
+        if not self.last_order:
+            return True
 
         if is_duplicate_order(
             order, self.last_order, self.levels_intersection_threshold, timeout=self.order_intersection_timeout
@@ -76,11 +76,26 @@ class OrderManager:
         if event.type == BrokerEventType.order_open:
             pass
 
-        if event.type == BrokerEventType.order_close_by_take_profit:
-            self.close_order_by_take_profit(order_id, event.created_at)
+        if event.type in (
+            BrokerEventType.order_close,
+            BrokerEventType.order_close_by_take_profit,
+            BrokerEventType.order_close_by_stop_loss,
+        ):
+            self.close_order(order_id, event.price, event.created_at)
 
-        if event.type == BrokerEventType.order_close_by_stop_loss:
-            self.close_order_by_stop_loss(order_id, event.created_at)
+    def find_orders_for_auto_close(self, now: datetime) -> List[OrderId]:
+        res = []
+
+        for order_id, order in self.orders.items():
+            if order.is_closed:
+                continue
+            if not order.auto_close_in:
+                continue
+            delta = now - order.trade_open.created_at
+            if delta >= order.auto_close_in:
+                res.append(order_id)
+
+        return res
 
     @property
     def orders_open(self) -> dict[OrderId, Order]:

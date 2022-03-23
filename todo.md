@@ -1,6 +1,10 @@
-broker.events не должен принимать kline, надо брать из внутренних данных
+убрать логику определения цены закрытия из order manager
+брать цену из события
 
-вытащить брокер из ордер-менеджера
+BrokerSimulator вынести в отдельный модуль
+пакет broker
+
+broker.events не должен принимать kline, надо брать из внутренних данных
 
 подвинуть в Order
 get_trade_close_type
@@ -9,9 +13,10 @@ get_trade_open_type
 стратегию переименовать в find_local_trade_opportunity или вроде того
 возвр OrderRequest ? или TradeRequest
 
-найти место для get_moving_window_iterator
+добавить TradingContextLocal и TradingContextGlobal
+хранят уровни и ключевые события
 
-def get_logger() - хранит синглетон логгера в замыкании
+найти место для get_moving_window_iterator
 
 close_order_by_xxx - возвращать новый ордер вместо мутирования старого
 
