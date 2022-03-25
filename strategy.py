@@ -4,9 +4,11 @@ from decimal import Decimal
 from enum import Enum
 from typing import List, Union, Optional, Callable
 
+from _datetime import timedelta
+
 from kline import Kline
 from level import Level
-from order import Order, create_order_long, create_order_short
+from order import Order, create_order, OrderType
 
 
 class Trend(Enum):
@@ -277,11 +279,11 @@ def strategy_basic(
 
         if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level) == Location.UP \
                 and calc_touch_ups(interactions) >= 1:
-            return create_order_long(kline, level)
+            return create_order_long(kline, level, stop_loss_level_percent=Decimal('1'), profit_loss_ratio=2)
 
         if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level) == Location.DOWN \
                 and calc_touch_downs(interactions) >= 1:
-            return create_order_short(kline, level)
+            return create_order_short(kline, level, stop_loss_level_percent=Decimal('1'), profit_loss_ratio=2)
 
 
 def calc_levels_intersection_rate(level_a, level_b) -> Decimal:
@@ -327,3 +329,47 @@ def is_order_late(order: Order, threshold: Decimal):
     level_mid = (order.level[0] + order.level[1]) / 2
     price_open_to_level_ratio = abs(order.trade_open.price - level_mid) / level_mid
     return price_open_to_level_ratio > threshold
+
+
+def add_percent(d: Decimal, percent: Union[int, Decimal]) -> Decimal:
+    if not isinstance(percent, Decimal):
+        percent = Decimal(percent)
+
+    res = d * (1 + Decimal('0.01') * percent)
+    return Decimal(round(res))
+
+
+def create_order_long(
+        kline: Kline, level: Level,
+        stop_loss_level_percent: Decimal,
+        profit_loss_ratio: Union[int, Decimal]
+) -> Order:
+    level_mid = (level[0] + level[1]) / 2
+
+    price_stop_loss = add_percent(level_mid, -stop_loss_level_percent)
+    price_take_profit = kline.close + profit_loss_ratio * (kline.close - price_stop_loss)
+
+    return create_order(
+        OrderType.LONG, kline, level,
+        price_take_profit=price_take_profit,
+        price_stop_loss=price_stop_loss,
+        auto_close_in=timedelta(hours=8)
+    )
+
+
+def create_order_short(
+        kline: Kline, level: Level,
+        stop_loss_level_percent: Decimal,
+        profit_loss_ratio: Union[int, Decimal]
+) -> Order:
+    level_mid = (level[0] + level[1]) / 2
+
+    price_stop_loss = add_percent(level_mid, stop_loss_level_percent)
+    price_take_profit = kline.close + profit_loss_ratio * (kline.close - price_stop_loss)
+
+    return create_order(
+        OrderType.SHORT, kline, level,
+        price_take_profit=price_take_profit,
+        price_stop_loss=price_stop_loss,
+        auto_close_in=timedelta(hours=8)
+    )
