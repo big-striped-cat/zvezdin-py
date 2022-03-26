@@ -1,9 +1,5 @@
 import logging
-logging.basicConfig(level=logging.INFO)
-
-from datetime import date
-
-from broker import Broker, BrokerSimulator, KlineDataRange
+from broker import Broker
 from kline import get_moving_window_iterator
 from ordermanager import OrderManager
 from strategy import strategy_basic, Trend, \
@@ -56,21 +52,3 @@ def backtest_strategy(
 
     logger.info(f'profit/loss on closed orders: {order_manager.profit()}')
     logger.info(f'profit/loss on open orders: {order_manager.profit_unrealized(last_price)}')
-
-
-if __name__ == '__main__':
-    # path = 'market_data/BTCBUSD-5m-2022-02-18.csv'
-    path_template = 'market_data/BTCBUSD-5m-%Y-%m-%d.csv'
-    date_from = date(2022, 2, 18)
-    date_to = date(2022, 2, 19)
-
-    kline_data_range = KlineDataRange(
-        path_template=path_template,
-        date_from=date_from,
-        date_to=date_to
-    )
-    broker = BrokerSimulator(kline_data_range=kline_data_range)
-
-    global_trend = Trend.DOWN
-
-    backtest_strategy(global_trend, broker)
