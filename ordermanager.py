@@ -13,38 +13,22 @@ logger = logging.getLogger(__name__)
 
 
 class OrderManager:
-    levels_intersection_threshold = Decimal('0.5')
-    order_intersection_timeout = timedelta(minutes=150)  # 2h 30m
-    price_open_to_level_ratio_threshold = Decimal('0.008')
+    """
+    OrderManager
+    * is mirroring orders created on broker side
+    * calculates overall profit/loss
+    * implements order auto close after given period of time
 
+    OrderManager SHOULD NOT make decisions about orders opening/closing.
+    OrderManager SHOULD NOT mutate order params.
+    """
     def __init__(self, global_trend: Optional[Trend] = None):
         self.orders: dict[OrderId, Order] = {}
         self.last_order: Optional[Order] = None
 
         self.global_trend = global_trend
 
-    def is_order_acceptable(self, order: Order):
-        if self.global_trend == Trend.DOWN and order.order_type == OrderType.LONG:
-            return False
-        if self.global_trend == Trend.UP and order.order_type == OrderType.SHORT:
-            return False
-
-        if not self.last_order:
-            return True
-
-        if is_duplicate_order(
-            order, self.last_order, self.levels_intersection_threshold, timeout=self.order_intersection_timeout
-        ):
-            return False
-
-        if is_order_late(order, self.price_open_to_level_ratio_threshold):
-            return False
-
-        return True
-
     def add_order(self, order_id: OrderId, order: Order):
-        assert self.is_order_acceptable(order)
-
         self.orders[order_id] = order
         self.last_order = order
 
