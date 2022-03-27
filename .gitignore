@@ -153,3 +153,5 @@ cython_debug/
 
 # market data files
 market_data/*
+
+config.yml
