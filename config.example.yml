@@ -4,4 +4,6 @@ trading_context:
     trend: down
     levels_intersection_threshold: '0.5'
     order_intersection_timeout: '150m'  # 2h 30m
+  local:
     price_open_to_level_ratio_threshold: '0.008'
+

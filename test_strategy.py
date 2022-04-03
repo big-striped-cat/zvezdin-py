@@ -1,18 +1,16 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import List, Callable
-
-from _datetime import timedelta
 
 from broker import read_klines_from_csv
 from kline import Kline
 from order import TradeType, Trade, OrderType
-from strategy import calc_local_maximums, calc_trend_by_extremums, Trend, calc_trend, \
-    calc_levels_intersection_rate, is_duplicate_order, Order, \
-    Level, get_highest_level, get_lowest_level, calc_levels_by_MA_extremums, calc_MA_list, \
-    calc_local_minimums, create_order_long, create_order_short
 from test_kline import kline_factory
 from test_utils import datetime_from_str
+from tradingcontextglobal import calc_levels_intersection_rate, is_duplicate_order
+from tradingcontextlocal import calc_local_maximums, calc_trend_by_extremums, Trend, calc_trend, Order, \
+    Level, get_highest_level, get_lowest_level, calc_levels_by_MA_extremums, calc_MA_list, \
+    calc_local_minimums, create_order_long, create_order_short
 
 
 def _test_calc_levels(

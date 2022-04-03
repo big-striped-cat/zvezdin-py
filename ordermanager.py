@@ -1,14 +1,12 @@
-from datetime import timedelta, datetime
+import logging
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List
 
-from broker import BrokerEvent, BrokerEventType, Broker
-from order import OrderId, Order, OrderType, get_trade_close_type, Trade
-from strategy import Trend, is_duplicate_order, is_order_late
+from broker import BrokerEvent, BrokerEventType
+from order import OrderId, Order, get_trade_close_type, Trade
 from utils import format_datetime
 
-
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -22,11 +20,9 @@ class OrderManager:
     OrderManager SHOULD NOT make decisions about orders opening/closing.
     OrderManager SHOULD NOT mutate order params.
     """
-    def __init__(self, global_trend: Optional[Trend] = None):
+    def __init__(self):
         self.orders: dict[OrderId, Order] = {}
         self.last_order: Optional[Order] = None
-
-        self.global_trend = global_trend
 
     def add_order(self, order_id: OrderId, order: Order):
         self.orders[order_id] = order

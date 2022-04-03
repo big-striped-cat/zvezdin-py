@@ -5,7 +5,8 @@ import click
 
 from backtest import backtest_strategy
 from broker import BrokerSimulator, KlineDataRange
-from strategy import Trend
+from configparser import parse_config
+from tradingcontextglobal import TradingContextGlobal
 
 logging.basicConfig(level=logging.INFO)
 
@@ -37,9 +38,10 @@ def backtest(date_from: datetime, date_to: datetime):
     )
     broker = BrokerSimulator(kline_data_range=kline_data_range)
 
-    global_trend = Trend.DOWN
+    config_path = 'config.yml'
+    context_global, context_local = parse_config(config_path)
 
-    backtest_strategy(global_trend, broker)
+    backtest_strategy(context_global, context_local, broker)
 
 
 if __name__ == '__main__':

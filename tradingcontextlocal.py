@@ -1,20 +1,14 @@
+import enum
 from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal
 from enum import Enum
 from typing import List, Union, Optional, Callable
 
-from _datetime import timedelta
-
 from kline import Kline
 from level import Level
 from order import Order, create_order, OrderType
-
-
-class Trend(Enum):
-    UP = 1
-    DOWN = 2
-    FLAT = 3
+from trend import Trend
 
 
 def calc_trend(window: List[Decimal]) -> Trend:
@@ -257,78 +251,57 @@ def calc_touch_ups(interactions: List[Interaction]) -> int:
     return res
 
 
-def strategy_basic(
-        klines: List[Kline], calc_levels: Callable[[list[Kline]], list[Level]]
-) -> Optional[Order]:
-    """
-    :param klines: historical klines. Current kline open price equals to klines[-1].close
-    :param calc_levels:
-    :param logger:
-    :return:
-    """
-    kline = klines[-1]
-    window = [k.close for k in klines]
-    point = window[-1]
-    trend = calc_trend(window)
-    levels = calc_levels(klines)
-    level_highest = get_highest_level(levels)
-    level_lowest = get_lowest_level(levels)
-
-    for level in (level_lowest, level_highest):
-        interactions = calc_level_interactions(window, level)
-
-        if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level) == Location.UP \
-                and calc_touch_ups(interactions) >= 1:
-            return create_order_long(kline, level, stop_loss_level_percent=Decimal('1'), profit_loss_ratio=2)
-
-        if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level) == Location.DOWN \
-                and calc_touch_downs(interactions) >= 1:
-            return create_order_short(kline, level, stop_loss_level_percent=Decimal('1'), profit_loss_ratio=2)
+class CalcLevelsStrategy(enum.Enum):
+    by_density = 1
+    by_MA_extremums = 2
 
 
-def calc_levels_intersection_rate(level_a, level_b) -> Decimal:
-    a_low, a_high = level_a
-    b_low, b_high = level_b
+class TradingContextLocal:
+    def __init__(
+            self,
+            price_open_to_level_ratio_threshold: Decimal = Decimal(),
+            calc_levels_strategy: CalcLevelsStrategy = CalcLevelsStrategy.by_MA_extremums
+    ):
+        self.price_open_to_level_ratio_threshold = price_open_to_level_ratio_threshold
 
-    if a_low >= b_high:
-        return Decimal(0)
-    if b_low >= a_high:
-        return Decimal(0)
+        # Callable[[list[Kline]], list[Level]]
+        self.calc_levels = {
+            CalcLevelsStrategy.by_density: calc_levels_by_density,
+            CalcLevelsStrategy.by_MA_extremums: calc_levels_by_MA_extremums,
+        }[calc_levels_strategy]
 
-    segment_1 = a_high - b_low
-    segment_2 = b_high - a_low
-    common_segment = min(segment_1, segment_2)
+    def get_order_request(self, klines: List[Kline]) -> Optional[Order]:
+        """
+        :param klines: historical klines. Current kline open price equals to klines[-1].close
+        :param calc_levels:
+        :param logger:
+        :return:
+        """
+        kline = klines[-1]
+        window = [k.close for k in klines]
+        point = window[-1]
+        trend = calc_trend(window)
+        levels = self.calc_levels(klines)
+        level_highest = get_highest_level(levels)
+        level_lowest = get_lowest_level(levels)
 
-    size_a = a_high - a_low
-    size_b = b_high - b_low
+        for level in (level_lowest, level_highest):
+            interactions = calc_level_interactions(window, level)
 
-    return 2 * common_segment / (size_a + size_b)
+            if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level) == Location.UP \
+                    and calc_touch_ups(interactions) >= 1 \
+                    and not self.is_order_late(level, kline.open):
+                return create_order_long(kline, level, stop_loss_level_percent=Decimal('1'), profit_loss_ratio=2)
 
+            if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level) == Location.DOWN \
+                    and calc_touch_downs(interactions) >= 1 \
+                    and not self.is_order_late(level, kline.open):
+                return create_order_short(kline, level, stop_loss_level_percent=Decimal('1'), profit_loss_ratio=2)
 
-def is_duplicate_order(
-        order_a: Order, order_b: Order,
-        level_intersection_threshold: Decimal,
-        timeout: Optional[timedelta] = None
-):
-    if order_a.order_type != order_b.order_type:
-        return False
-
-    if timeout:
-        delta = order_a.trade_open.created_at - order_b.trade_open.created_at
-        if abs(delta.total_seconds()) < timeout.total_seconds():
-            return True
-
-    levels_intersection_rate = calc_levels_intersection_rate(order_a.level, order_b.level)
-    if levels_intersection_rate >= level_intersection_threshold:
-        return True
-
-    return False
-
-
-def is_order_late(order: Order, threshold: Decimal):
-    level_mid = (order.level[0] + order.level[1]) / 2
-    price_open_to_level_ratio = abs(order.trade_open.price - level_mid) / level_mid
-    return price_open_to_level_ratio > threshold
+    def is_order_late(self, level: Level, price: Decimal) -> bool:
+        level_mid = (level[0] + level[1]) / 2
+        price_open_to_level_ratio = abs(price - level_mid) / level_mid
+        return price_open_to_level_ratio > self.price_open_to_level_ratio_threshold
 
 
 def add_percent(d: Decimal, percent: Union[int, Decimal]) -> Decimal:

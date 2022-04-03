@@ -1,23 +1,22 @@
 import logging
+
 from broker import Broker
 from kline import get_moving_window_iterator
 from ordermanager import OrderManager
-from strategy import strategy_basic, Trend, \
-    calc_levels_by_MA_extremums
+from tradingcontextglobal import TradingContextGlobal
+from tradingcontextlocal import TradingContextLocal
 
 logger = logging.getLogger(__name__)
 
 
 def backtest_strategy(
-        global_trend: Trend,
+        context_global: TradingContextGlobal,
+        context_local: TradingContextLocal,
         broker: Broker
 ):
     kline_window_size = 30
 
-    strategy = strategy_basic
-    calc_levels = calc_levels_by_MA_extremums
-
-    order_manager = OrderManager(global_trend=global_trend)
+    order_manager = context_global.order_manager
 
     kline_window = []
 
@@ -35,12 +34,12 @@ def backtest_strategy(
         for event in broker.events(kline):
             order_manager.handle_broker_event(event)
 
-        # pass historical klines to strategy
-        order = strategy(kline_window[:-1], calc_levels)
+        # pass historical klines
+        order = context_local.get_order_request(kline_window[:-1])
         if not order:
             continue
 
-        if order_manager.is_order_acceptable(order):
+        if context_global.is_order_acceptable(order):
             event = broker.add_order(order)
             order_manager.add_order(event.order_id, order)
 
