@@ -16,7 +16,8 @@ def backtest_strategy(
 ):
     kline_window_size = 30
 
-    order_manager = context_global.order_manager
+    order_list = context_global.order_list
+    order_manager = OrderManager(order_list)
 
     kline_window = []
 
@@ -46,8 +47,8 @@ def backtest_strategy(
     assert kline_window, 'Not enough klines'
     last_price = kline_window[-1].close
 
-    logger.info(f'total orders open: {len(order_manager.orders_open)}')
-    logger.info(f'total orders closed: {len(order_manager.orders_closed)}')
+    logger.info(f'total orders open: {len(order_list.orders_open)}')
+    logger.info(f'total orders closed: {len(order_list.orders_closed)}')
 
-    logger.info(f'profit/loss on closed orders: {order_manager.profit()}')
-    logger.info(f'profit/loss on open orders: {order_manager.profit_unrealized(last_price)}')
+    logger.info(f'profit/loss on closed orders: {order_list.profit()}')
+    logger.info(f'profit/loss on open orders: {order_list.profit_unrealized(last_price)}')

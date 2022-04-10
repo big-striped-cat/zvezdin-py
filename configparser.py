@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Optional, Tuple
 from yaml import load, Loader
 
-from ordermanager import OrderManager
+from ordermanager import OrderList
 from tradingcontextglobal import TradingContextGlobal
 from tradingcontextlocal import TradingContextLocal
 from trend import Trend
@@ -49,6 +49,6 @@ def parse_config(path) -> Tuple[TradingContextGlobal, TradingContextLocal]:
         configs['trading_context']['local']
     )
     return (
-        TradingContextGlobal(OrderManager(), **trading_context_global_config),
+        TradingContextGlobal(OrderList(), **trading_context_global_config),
         TradingContextLocal(**trading_context_local_config)
     )

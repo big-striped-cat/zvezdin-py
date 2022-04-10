@@ -4,19 +4,19 @@ from typing import Optional
 from _datetime import timedelta
 
 from order import Order, OrderType
-from ordermanager import OrderManager
+from ordermanager import OrderList
 from trend import Trend
 
 
 class TradingContextGlobal:
     def __init__(
         self,
-        order_manager: OrderManager,
+        order_list: OrderList,
         trend: Optional[Trend] = None,
         levels_intersection_threshold: Decimal = Decimal(),
         order_intersection_timeout: timedelta = timedelta()
     ):
-        self.order_manager = order_manager
+        self.order_list = order_list
 
         self.trend = trend or Trend.FLAT
 
@@ -29,12 +29,12 @@ class TradingContextGlobal:
         if self.trend == Trend.UP and order.order_type == OrderType.SHORT:
             return False
 
-        if not self.order_manager.last_order:
+        if not self.order_list.last_order:
             return True
 
         if is_duplicate_order(
             order,
-            self.order_manager.last_order,
+            self.order_list.last_order,
             self.levels_intersection_threshold,
             timeout=self.order_intersection_timeout
         ):
