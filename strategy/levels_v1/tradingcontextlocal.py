@@ -8,6 +8,7 @@ from typing import List, Union, Optional, Callable
 from kline import Kline
 from level import Level
 from order import Order, create_order, OrderType
+from strategy.tradingcontextlocal import TradingContextLocalBase
 from trend import Trend
 
 
@@ -256,7 +257,7 @@ class CalcLevelsStrategy(enum.Enum):
     by_MA_extremums = 2
 
 
-class TradingContextLocal:
+class TradingContextLocal(TradingContextLocalBase):
     def __init__(
             self,
             price_open_to_level_ratio_threshold: Decimal = Decimal(),
@@ -275,8 +276,6 @@ class TradingContextLocal:
     def get_order_request(self, klines: List[Kline]) -> Optional[Order]:
         """
         :param klines: historical klines. Current kline open price equals to klines[-1].close
-        :param calc_levels:
-        :param logger:
         :return:
         """
         kline = klines[-1]

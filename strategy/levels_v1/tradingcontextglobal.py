@@ -4,11 +4,12 @@ from typing import Optional
 from _datetime import timedelta
 
 from order import Order, OrderType
-from ordermanager import OrderList
+from orderlist import OrderList
+from strategy.tradingcontextglobal import TradingContextGlobalBase
 from trend import Trend
 
 
-class TradingContextGlobal:
+class TradingContextGlobal(TradingContextGlobalBase):
     def __init__(
         self,
         order_list: OrderList,

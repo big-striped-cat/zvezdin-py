@@ -154,4 +154,4 @@ cython_debug/
 # market data files
 market_data/*
 
-config.yml
+strategy/levels_v1/config.yml

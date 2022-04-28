@@ -3,15 +3,15 @@ import logging
 from broker import Broker
 from kline import get_moving_window_iterator
 from ordermanager import OrderManager
-from tradingcontextglobal import TradingContextGlobal
-from tradingcontextlocal import TradingContextLocal
+from strategy.tradingcontextglobal import TradingContextGlobalBase
+from strategy.tradingcontextlocal import TradingContextLocalBase
 
 logger = logging.getLogger(__name__)
 
 
 def backtest_strategy(
-        context_global: TradingContextGlobal,
-        context_local: TradingContextLocal,
+        context_global: TradingContextGlobalBase,
+        context_local: TradingContextLocalBase,
         broker: Broker
 ):
     kline_window_size = 30

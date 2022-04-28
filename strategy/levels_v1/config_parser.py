@@ -9,8 +9,8 @@ from typing import Optional, Tuple
 from yaml import load, Loader
 
 from ordermanager import OrderList
-from tradingcontextglobal import TradingContextGlobal
-from tradingcontextlocal import TradingContextLocal
+from strategy.levels_v1.tradingcontextglobal import TradingContextGlobal
+from strategy.levels_v1.tradingcontextlocal import TradingContextLocal
 from trend import Trend
 
 

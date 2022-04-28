@@ -7,8 +7,8 @@ from kline import Kline
 from order import TradeType, Trade, OrderType
 from test_kline import kline_factory
 from test_utils import datetime_from_str
-from tradingcontextglobal import calc_levels_intersection_rate, is_duplicate_order
-from tradingcontextlocal import calc_local_maximums, calc_trend_by_extremums, Trend, calc_trend, Order, \
+from strategy.levels_v1.tradingcontextglobal import calc_levels_intersection_rate, is_duplicate_order
+from strategy.levels_v1.tradingcontextlocal import calc_local_maximums, calc_trend_by_extremums, Trend, calc_trend, Order, \
     Level, get_highest_level, get_lowest_level, calc_levels_by_MA_extremums, calc_MA_list, \
     calc_local_minimums, create_order_long, create_order_short
 

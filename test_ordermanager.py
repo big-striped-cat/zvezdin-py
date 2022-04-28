@@ -5,7 +5,7 @@ from broker import BrokerEvent, BrokerEventType
 from order import TradeType, OrderType, OrderId
 from orderlist import OrderList
 from ordermanager import OrderManager
-from test_strategy import trade_factory, order_factory
+from strategy.levels_v1.test_strategy import trade_factory, order_factory
 
 
 def broker_event_factory(
