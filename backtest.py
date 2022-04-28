@@ -27,9 +27,9 @@ def backtest_strategy(
         kline = kline_window[-1]
 
         for order_id in order_manager.find_orders_for_auto_close(kline.open_time):
-            event = broker.close_order(order_id, kline)
-
             logger.info('Order id=%s will be auto closed', order_id)
+
+            event = broker.close_order(order_id, kline)
             order_manager.handle_broker_event(event)
 
         for event in broker.events(kline):

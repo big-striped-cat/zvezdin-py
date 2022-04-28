@@ -1,3 +1,7 @@
+"""
+Without underscore this module clashes with built-in 'configparser' module.
+"""
+
 import re
 from datetime import timedelta
 from decimal import Decimal
@@ -11,10 +15,17 @@ from trend import Trend
 
 
 def parse_timedelta(delta: str) -> Optional[timedelta]:
-    match = re.match('^(\d+)m$', delta)
-    if match:
-        minutes = int(match.group(1))
-        return timedelta(minutes=minutes)
+    match = re.match(r'^(\d+)([m|h])$', delta)
+    if not match:
+        return
+
+    number = int(match.group(1))
+    unit = match.group(2)
+
+    if unit == 'm':
+        return timedelta(minutes=number)
+    elif unit == 'h':
+        return timedelta(hours=number)
 
 
 def convert_trading_context_global_config(config: dict) -> dict:
@@ -36,6 +47,7 @@ def convert_trading_context_local_config(config: dict) -> dict:
     """
     return {
         'price_open_to_level_ratio_threshold': Decimal(config['price_open_to_level_ratio_threshold']),
+        'auto_close_in': parse_timedelta(config['auto_close_in'])
     }
 
 

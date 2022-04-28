@@ -260,9 +260,11 @@ class TradingContextLocal:
     def __init__(
             self,
             price_open_to_level_ratio_threshold: Decimal = Decimal(),
+            auto_close_in: timedelta = None,
             calc_levels_strategy: CalcLevelsStrategy = CalcLevelsStrategy.by_MA_extremums
     ):
         self.price_open_to_level_ratio_threshold = price_open_to_level_ratio_threshold
+        self.auto_close_in = auto_close_in
 
         # Callable[[list[Kline]], list[Level]]
         self.calc_levels = {
@@ -291,12 +293,18 @@ class TradingContextLocal:
             if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level) == Location.UP \
                     and calc_touch_ups(interactions) >= 1 \
                     and not self.is_order_late(level, kline.open):
-                return create_order_long(kline, level, stop_loss_level_percent=Decimal('1'), profit_loss_ratio=2)
+                return create_order_long(
+                    kline, level, stop_loss_level_percent=Decimal('1'), profit_loss_ratio=2,
+                    auto_close_in=self.auto_close_in
+                )
 
             if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level) == Location.DOWN \
                     and calc_touch_downs(interactions) >= 1 \
                     and not self.is_order_late(level, kline.open):
-                return create_order_short(kline, level, stop_loss_level_percent=Decimal('1'), profit_loss_ratio=2)
+                return create_order_short(
+                    kline, level, stop_loss_level_percent=Decimal('1'), profit_loss_ratio=2,
+                    auto_close_in=self.auto_close_in
+                )
 
     def is_order_late(self, level: Level, price: Decimal) -> bool:
         level_mid = (level[0] + level[1]) / 2
@@ -315,7 +323,8 @@ def add_percent(d: Decimal, percent: Union[int, Decimal]) -> Decimal:
 def create_order_long(
         kline: Kline, level: Level,
         stop_loss_level_percent: Decimal,
-        profit_loss_ratio: Union[int, Decimal]
+        profit_loss_ratio: Union[int, Decimal],
+        auto_close_in: timedelta = None
 ) -> Order:
     level_mid = (level[0] + level[1]) / 2
 
@@ -326,14 +335,15 @@ def create_order_long(
         OrderType.LONG, kline, level,
         price_take_profit=price_take_profit,
         price_stop_loss=price_stop_loss,
-        auto_close_in=timedelta(hours=8)
+        auto_close_in=auto_close_in
     )
 
 
 def create_order_short(
         kline: Kline, level: Level,
         stop_loss_level_percent: Decimal,
-        profit_loss_ratio: Union[int, Decimal]
+        profit_loss_ratio: Union[int, Decimal],
+        auto_close_in: timedelta = None
 ) -> Order:
     level_mid = (level[0] + level[1]) / 2
 
@@ -344,5 +354,5 @@ def create_order_short(
         OrderType.SHORT, kline, level,
         price_take_profit=price_take_profit,
         price_stop_loss=price_stop_loss,
-        auto_close_in=timedelta(hours=8)
+        auto_close_in=auto_close_in
     )
