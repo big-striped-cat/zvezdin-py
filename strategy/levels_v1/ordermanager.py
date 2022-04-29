@@ -5,11 +5,11 @@ from _datetime import timedelta
 
 from order import Order, OrderType
 from orderlist import OrderList
-from strategy.tradingcontextglobal import TradingContextGlobalBase
+from strategy.ordermanager import OrderManager
 from trend import Trend
 
 
-class TradingContextGlobal(TradingContextGlobalBase):
+class DeduplicateOrderManager(OrderManager):
     def __init__(
         self,
         order_list: OrderList,

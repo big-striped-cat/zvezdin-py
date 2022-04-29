@@ -2,7 +2,7 @@ from order import Order
 from orderlist import OrderList
 
 
-class TradingContextGlobalBase:
+class OrderManager:
     def __init__(
         self,
         order_list: OrderList = None

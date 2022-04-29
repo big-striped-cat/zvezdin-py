@@ -1,8 +1,9 @@
 from typing import Tuple
 
-from .tradingcontextglobal import TradingContextGlobal
-from .tradingcontextlocal import TradingContextLocal
+from .emitter import ConstantEmitter
+from .ordermanager import HoldOrderManager
+from ..emitter import SignalEmitter
 
 
-def init_context() -> Tuple[TradingContextGlobal, TradingContextLocal]:
-    return TradingContextGlobal(), TradingContextLocal()
+def init_context() -> Tuple[HoldOrderManager, SignalEmitter]:
+    return HoldOrderManager(), ConstantEmitter()

@@ -5,12 +5,12 @@ from typing import List, Callable
 from broker import read_klines_from_csv
 from kline import Kline
 from order import TradeType, Trade, OrderType
-from test_kline import kline_factory
-from test_utils import datetime_from_str
-from strategy.levels_v1.tradingcontextglobal import calc_levels_intersection_rate, is_duplicate_order
-from strategy.levels_v1.tradingcontextlocal import calc_local_maximums, calc_trend_by_extremums, Trend, calc_trend, Order, \
+from strategy.levels_v1.emitter import calc_local_maximums, calc_trend_by_extremums, Trend, calc_trend, Order, \
     Level, get_highest_level, get_lowest_level, calc_levels_by_MA_extremums, calc_MA_list, \
     calc_local_minimums, create_order_long, create_order_short
+from strategy.levels_v1.ordermanager import calc_levels_intersection_rate, is_duplicate_order
+from test_kline import kline_factory
+from test_utils import datetime_from_str
 
 
 def _test_calc_levels(

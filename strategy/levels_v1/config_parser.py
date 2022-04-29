@@ -6,11 +6,12 @@ import re
 from datetime import timedelta
 from decimal import Decimal
 from typing import Optional, Tuple
+
 from yaml import load, Loader
 
-from ordermanager import OrderList
-from strategy.levels_v1.tradingcontextglobal import TradingContextGlobal
-from strategy.levels_v1.tradingcontextlocal import TradingContextLocal
+from orderlist import OrderList
+from strategy.levels_v1.emitter import JumpLevelEmitter
+from strategy.levels_v1.ordermanager import DeduplicateOrderManager
 from trend import Trend
 
 
@@ -51,7 +52,7 @@ def convert_trading_context_local_config(config: dict) -> dict:
     }
 
 
-def parse_config(path) -> Tuple[TradingContextGlobal, TradingContextLocal]:
+def parse_config(path) -> Tuple[DeduplicateOrderManager, JumpLevelEmitter]:
     with open(path) as f:
         configs = load(f, Loader=Loader)
     trading_context_global_config = convert_trading_context_global_config(
@@ -61,6 +62,6 @@ def parse_config(path) -> Tuple[TradingContextGlobal, TradingContextLocal]:
         configs['trading_context']['local']
     )
     return (
-        TradingContextGlobal(OrderList(), **trading_context_global_config),
-        TradingContextLocal(**trading_context_local_config)
+        DeduplicateOrderManager(OrderList(), **trading_context_global_config),
+        JumpLevelEmitter(**trading_context_local_config)
     )

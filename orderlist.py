@@ -13,6 +13,8 @@ class OrderList:
     * is mirroring orders created on broker side
     * calculates overall profit/loss
 
+    Think of it as wrapper around database table.
+
     OrderList SHOULD NOT make decisions about orders opening/closing.
     OrderList SHOULD NOT mutate order params.
     """

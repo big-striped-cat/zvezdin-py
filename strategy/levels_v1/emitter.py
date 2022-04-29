@@ -8,7 +8,7 @@ from typing import List, Union, Optional, Callable
 from kline import Kline
 from level import Level
 from order import Order, create_order, OrderType
-from strategy.tradingcontextlocal import TradingContextLocalBase
+from strategy.emitter import SignalEmitter
 from trend import Trend
 
 
@@ -257,7 +257,7 @@ class CalcLevelsStrategy(enum.Enum):
     by_MA_extremums = 2
 
 
-class TradingContextLocal(TradingContextLocalBase):
+class JumpLevelEmitter(SignalEmitter):
     def __init__(
             self,
             price_open_to_level_ratio_threshold: Decimal = Decimal(),

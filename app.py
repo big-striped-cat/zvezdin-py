@@ -7,8 +7,8 @@ import click
 from backtest import backtest_strategy
 from broker import BrokerSimulator, KlineDataRange
 
-from strategy.tradingcontextglobal import TradingContextGlobalBase
-from strategy.tradingcontextlocal import TradingContextLocalBase
+from strategy.ordermanager import OrderManager
+from strategy.emitter import SignalEmitter
 
 logging.basicConfig(level=logging.INFO)
 
@@ -21,7 +21,7 @@ def cli():
     pass
 
 
-def init_strategy_context(strategy_name) -> Tuple[TradingContextGlobalBase, TradingContextLocalBase]:
+def init_strategy_context(strategy_name) -> Tuple[OrderManager, SignalEmitter]:
     pkg = {
         'buy-and-hold': 'strategy.buy_and_hold',
         'sell-and-hold': 'strategy.sell_and_hold',

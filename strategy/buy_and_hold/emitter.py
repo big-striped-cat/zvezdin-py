@@ -2,9 +2,10 @@ from typing import List, Optional
 
 from kline import Kline
 from order import Order, create_order, OrderType
+from strategy.emitter import SignalEmitter
 
 
-class TradingContextLocal:
+class ConstantEmitter(SignalEmitter):
     def __init__(self):
         pass
 

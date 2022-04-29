@@ -11,11 +11,12 @@ from utils import format_datetime
 logger = logging.getLogger(__name__)
 
 
-class OrderManager:
+class LocalBroker:
     """
-    OrderManager
-    * handles broker events: closes orders
+    LocalBroker:
+    * handles remote broker events: closes orders
     * implements order auto close after given period of time
+    * does NOT make trading decisions
     """
     def __init__(self, order_list: OrderList):
         self.order_list = order_list
@@ -67,7 +68,7 @@ class OrderManager:
                     f'by price {order.trade_close.price}, '
                     f'with profit/loss {order.get_profit()}')
 
-    def handle_broker_event(self, event: BrokerEvent):
+    def handle_remote_event(self, event: BrokerEvent):
         order_id = event.order_id
 
         if event.type == BrokerEventType.order_open:
