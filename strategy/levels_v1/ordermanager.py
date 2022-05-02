@@ -1,11 +1,12 @@
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Union
 
 from _datetime import timedelta
 
 from order import Order, OrderType
 from orderlist import OrderList
 from strategy.ordermanager import OrderManager
+from strategy.utils import parse_timedelta
 from trend import Trend
 
 
@@ -13,11 +14,20 @@ class DeduplicateOrderManager(OrderManager):
     def __init__(
         self,
         order_list: OrderList,
-        trend: Optional[Trend] = None,
-        levels_intersection_threshold: Decimal = Decimal(),
-        order_intersection_timeout: timedelta = timedelta()
+        trend: Union[Trend, str] = None,
+        levels_intersection_threshold: Union[Decimal, str] = Decimal(),
+        order_intersection_timeout: Union[timedelta, str] = timedelta()
     ):
-        self.order_list = order_list
+        super().__init__(order_list)
+
+        if isinstance(trend, str):
+            trend = Trend[trend.upper()]
+
+        if isinstance(levels_intersection_threshold, str):
+            levels_intersection_threshold = Decimal(levels_intersection_threshold)
+
+        if isinstance(order_intersection_timeout, str):
+            order_intersection_timeout = parse_timedelta(order_intersection_timeout)
 
         self.trend = trend or Trend.FLAT
 

@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from strategy.levels_v1.config_parser import parse_timedelta
+from strategy.utils import parse_timedelta
 
 
 def test_parse_timedelta():

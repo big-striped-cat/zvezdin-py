@@ -6,8 +6,8 @@ from strategy.emitter import SignalEmitter
 
 
 class ConstantEmitter(SignalEmitter):
-    def __init__(self):
-        pass
+    def __init__(self, order_type: OrderType = None):
+        self.order_type = order_type
 
     def get_order_request(self, klines: List[Kline]) -> Optional[Order]:
         """
@@ -18,5 +18,5 @@ class ConstantEmitter(SignalEmitter):
         level = (kline.close, kline.close)
 
         return create_order(
-            OrderType.LONG, kline, level
+            self.order_type, kline, level
         )

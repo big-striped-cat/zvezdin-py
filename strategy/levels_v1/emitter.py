@@ -9,6 +9,7 @@ from kline import Kline
 from level import Level
 from order import Order, create_order, OrderType
 from strategy.emitter import SignalEmitter
+from strategy.utils import parse_timedelta
 from trend import Trend
 
 
@@ -264,6 +265,12 @@ class JumpLevelEmitter(SignalEmitter):
             auto_close_in: timedelta = None,
             calc_levels_strategy: CalcLevelsStrategy = CalcLevelsStrategy.by_MA_extremums
     ):
+        if not isinstance(price_open_to_level_ratio_threshold, Decimal):
+            price_open_to_level_ratio_threshold = Decimal(price_open_to_level_ratio_threshold)
+
+        if isinstance(auto_close_in, str):
+            auto_close_in = parse_timedelta(auto_close_in)
+
         self.price_open_to_level_ratio_threshold = price_open_to_level_ratio_threshold
         self.auto_close_in = auto_close_in
 
