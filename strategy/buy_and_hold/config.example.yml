@@ -1,0 +1,4 @@
+---
+order_manager:
+  order_type: long
+emitter:

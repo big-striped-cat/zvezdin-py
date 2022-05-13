@@ -1,0 +1,3 @@
+open time,open,high,low,close,volume,close time,quote asset volume,Number of trades,Taker buy base asset volume,Taker buy quote asset volume
+1642636800000,4.4,4.6,3.9,4.5,110.6,1642637099999,4616666.4140,1532,52.159,2175399.0397,0
+1642637100000,4.5,4.8,4.1,4.3,48.5,1642637399999,2022300.1856,1052,21.734,905796.9544,0
