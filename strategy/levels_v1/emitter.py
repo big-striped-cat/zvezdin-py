@@ -1,6 +1,6 @@
 import enum
 from collections import defaultdict
-from datetime import timedelta
+from datetime import timedelta, datetime
 from decimal import Decimal
 from enum import Enum
 from typing import List, Union, Optional, Callable
@@ -286,6 +286,10 @@ class JumpLevelEmitter(SignalEmitter):
         :return:
         """
         kline = klines[-1]
+
+        # close price of previous kline is current price
+        price = kline.close
+
         window = [k.close for k in klines]
         point = window[-1]
         trend = calc_trend(window)
@@ -298,7 +302,7 @@ class JumpLevelEmitter(SignalEmitter):
 
             if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level) == Location.UP \
                     and calc_touch_ups(interactions) >= 1 \
-                    and not self.is_order_late(level, kline.open):
+                    and not self.is_order_late(level, price):
                 return create_order_long(
                     kline, level, stop_loss_level_percent=Decimal('1'), profit_loss_ratio=2,
                     auto_close_in=self.auto_close_in
@@ -306,7 +310,7 @@ class JumpLevelEmitter(SignalEmitter):
 
             if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level) == Location.DOWN \
                     and calc_touch_downs(interactions) >= 1 \
-                    and not self.is_order_late(level, kline.open):
+                    and not self.is_order_late(level, price):
                 return create_order_short(
                     kline, level, stop_loss_level_percent=Decimal('1'), profit_loss_ratio=2,
                     auto_close_in=self.auto_close_in

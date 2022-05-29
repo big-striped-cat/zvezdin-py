@@ -49,9 +49,9 @@ class LocalBroker:
     def log_order_opened(self, order_id: OrderId):
         order = self.order_list.get(order_id)
         opened_at = order.trade_open.created_at
-        close_time_str = format_datetime(opened_at)
+        opened_at_str = format_datetime(opened_at)
         level_str = f'Level[{order.level[0]}, {order.level[1]}]'
-        logger.info(f'Order opened id={order_id} {order.order_type} {close_time_str} on {level_str} '
+        logger.info(f'Order opened id={order_id} {order.order_type} {opened_at_str} on {level_str} '
                     f'by price {order.trade_open.price}, '
                     f'take profit {order.price_take_profit}, '
                     f'stop loss {order.price_stop_loss}')
@@ -63,8 +63,8 @@ class LocalBroker:
         """
         order = self.order_list.get(order_id)
         closed_at = order.trade_close.created_at
-        close_time_str = format_datetime(closed_at)
-        logger.info(f'Order closed id={order_id} {order.order_type} {close_time_str} '
+        closed_at_str = format_datetime(closed_at)
+        logger.info(f'Order closed id={order_id} {order.order_type} {closed_at_str} '
                     f'by price {order.trade_close.price}, '
                     f'with profit/loss {order.get_profit()}')
 
