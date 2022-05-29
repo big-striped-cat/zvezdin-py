@@ -10,13 +10,13 @@ logger = logging.getLogger(__name__)
 
 
 def backtest_strategy(
-        context_global: OrderManager,
-        context_local: SignalEmitter,
+        order_manager: OrderManager,
+        emitter: SignalEmitter,
         broker: Broker
 ):
     kline_window_size = 30
 
-    order_list = context_global.order_list
+    order_list = order_manager.order_list
     local_broker = LocalBroker(order_list)
 
     kline_window = []
@@ -36,11 +36,11 @@ def backtest_strategy(
             local_broker.handle_remote_event(event)
 
         # pass historical klines
-        order = context_local.get_order_request(kline_window[:-1])
+        order = emitter.get_order_request(kline_window[:-1])
         if not order:
             continue
 
-        if context_global.is_order_acceptable(order):
+        if order_manager.is_order_acceptable(order):
             event = broker.add_order(order)
             local_broker.add_order(event.order_id, order)
 
