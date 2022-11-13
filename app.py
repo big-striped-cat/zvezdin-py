@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Tuple
 
 import click
+from yaml import load, Loader
 
 from backtest import backtest_strategy
 from broker import BrokerSimulator, KlineDataRange
@@ -49,7 +50,14 @@ def backtest(strategy: str, date_from: datetime, date_to: datetime):
         date_from=date_from,
         date_to=date_to
     )
-    broker = BrokerSimulator(kline_data_range=kline_data_range)
+
+    with open('config.yml') as f:
+        configs = load(f, Loader=Loader)
+
+    broker = BrokerSimulator(
+        kline_data_range=kline_data_range,
+        config=configs.get('broker', {}).get('simulator', {})
+    )
 
     context_global, context_local = init_strategy_context(strategy)
     backtest_strategy(context_global, context_local, broker)

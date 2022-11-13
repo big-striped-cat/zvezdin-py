@@ -6,6 +6,12 @@ The platform is supposed for backtesting and running trading strategies.
 
 ## Configuring a strategy
 
+First create global config:
+
+```shell
+cp config.example.yml config.yml
+```
+
 Strategies are located in strategy/ dir. There are some built-in strategies:
 
 * buy-and-hold strategy. Can be configured to sell and hold also.

@@ -44,14 +44,17 @@ class BrokerSimulator(Broker):
     def __init__(
         self,
         klines_csv_path: Optional[str] = None,
-        kline_data_range: Optional['KlineDataRange'] = None
+        kline_data_range: Optional['KlineDataRange'] = None,
+        config=None
     ):
         assert klines_csv_path or kline_data_range
         path_iter = (klines_csv_path,) if klines_csv_path else kline_data_range.path_iter()
 
+        self.config = config or {}
+
         self._klines = get_klines_iter(
             path_iter,
-            skip_header=False,
+            skip_header=self.config.get('skip_header', True),
             timeframe=timedelta(minutes=5)
         )
 
