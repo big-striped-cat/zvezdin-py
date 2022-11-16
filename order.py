@@ -8,7 +8,7 @@ from typing import Optional, Union
 from _datetime import timedelta
 
 from kline import Kline
-from level import Level
+from lib.levels import Level
 
 logger = logging.getLogger(__name__)
 

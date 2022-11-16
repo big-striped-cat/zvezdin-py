@@ -5,7 +5,7 @@ from broker import BrokerEvent, BrokerEventType
 from order import TradeType, OrderType, OrderId
 from orderlist import OrderList
 from localbroker import LocalBroker
-from strategy.levels_v1.test_strategy import trade_factory, order_factory
+from factories import trade_factory, order_factory
 
 
 def broker_event_factory(
@@ -24,7 +24,7 @@ def broker_event_factory(
     )
 
 
-class TestOrderManager:
+class TestLocalBroker:
     def test_long_close_by_take_profit(self):
         trade_open = trade_factory(trade_type=TradeType.BUY, price=Decimal(30))
         order = order_factory(
@@ -33,15 +33,15 @@ class TestOrderManager:
             price_take_profit=Decimal(55),
             price_stop_loss=Decimal(20)
         )
-        om = LocalBroker(OrderList())
+        broker = LocalBroker(OrderList())
         order_id = 1
-        om.add_order(order_id, order)
+        broker.add_order(order_id, order)
 
         event = broker_event_factory(
             event_type=BrokerEventType.order_close_by_take_profit,
             price=Decimal(55)
         )
-        om.handle_remote_event(event)
+        broker.handle_remote_event(event)
 
         assert order.is_closed
         assert order.trade_close.price == Decimal(55)
@@ -54,15 +54,15 @@ class TestOrderManager:
             price_take_profit=Decimal(100),
             price_stop_loss=Decimal(35)
         )
-        om = LocalBroker(OrderList())
+        broker = LocalBroker(OrderList())
         order_id = 1
-        om.add_order(order_id, order)
+        broker.add_order(order_id, order)
 
         event = broker_event_factory(
             event_type=BrokerEventType.order_close_by_stop_loss,
             price=Decimal(35)
         )
-        om.handle_remote_event(event)
+        broker.handle_remote_event(event)
 
         assert order.is_closed
         assert order.trade_close.price == Decimal(35)
@@ -76,16 +76,16 @@ class TestOrderManager:
             price_stop_loss=Decimal(100)
         )
 
-        om = LocalBroker(OrderList())
+        broker = LocalBroker(OrderList())
         order_id = 1
-        om.add_order(order_id, order)
+        broker.add_order(order_id, order)
 
         event = broker_event_factory(
             event_type=BrokerEventType.order_close_by_take_profit,
             price=Decimal(35)
         )
 
-        om.handle_remote_event(event)
+        broker.handle_remote_event(event)
 
         assert order.is_closed
         assert order.trade_close.price == Decimal(35)
@@ -99,21 +99,21 @@ class TestOrderManager:
             price_stop_loss=Decimal(55)
         )
 
-        om = LocalBroker(OrderList())
+        broker = LocalBroker(OrderList())
         order_id = 1
-        om.add_order(order_id, order)
+        broker.add_order(order_id, order)
 
         event = broker_event_factory(
             event_type=BrokerEventType.order_close_by_stop_loss,
             price=Decimal(55)
         )
-        om.handle_remote_event(event)
+        broker.handle_remote_event(event)
 
         assert order.is_closed
         assert order.trade_close.price == Decimal(55)
 
     def test_find_orders_for_auto_close(self):
-        om = LocalBroker(OrderList())
+        broker = LocalBroker(OrderList())
 
         # auto_close is not enabled for an order
         trade_open = trade_factory(trade_type=TradeType.BUY, price=Decimal(30), created_at=datetime(2022, 1, 1))
@@ -123,10 +123,10 @@ class TestOrderManager:
             price_take_profit=Decimal(65),
             price_stop_loss=Decimal(20)
         )
-        om.add_order(1, order)
+        broker.add_order(1, order)
 
         now = datetime(2022, 2, 1)
-        assert om.find_orders_for_auto_close(now) == []
+        assert broker.find_orders_for_auto_close(now) == []
 
         # auto_close is enabled
         trade_open = trade_factory(trade_type=TradeType.BUY, price=Decimal(30), created_at=datetime(2022, 3, 1))
@@ -137,12 +137,12 @@ class TestOrderManager:
             price_stop_loss=Decimal(20),
             auto_close_in=timedelta(minutes=10)
         )
-        om.add_order(1, order)
+        broker.add_order(1, order)
 
         # 1 minute before auto close time
         now = datetime(2022, 3, 1, 0, 9)
-        assert om.find_orders_for_auto_close(now) == []
+        assert broker.find_orders_for_auto_close(now) == []
 
         # auto close time exactly
         now = datetime(2022, 3, 1, 0, 10)
-        assert om.find_orders_for_auto_close(now) == [1]
+        assert broker.find_orders_for_auto_close(now) == [1]

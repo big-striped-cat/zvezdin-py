@@ -3,11 +3,11 @@ from typing import Optional, Union
 
 from _datetime import timedelta
 
+from lib.trend import Trend
 from order import Order, OrderType
 from orderlist import OrderList
 from strategy.ordermanager import OrderManager
 from strategy.utils import parse_timedelta
-from trend import Trend
 
 
 class DeduplicateOrderManager(OrderManager):
