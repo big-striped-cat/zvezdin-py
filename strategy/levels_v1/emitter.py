@@ -4,9 +4,9 @@ from decimal import Decimal
 from typing import List, Union, Optional
 
 from kline import Kline
-from lib.levels import calc_levels_by_density, calc_levels_by_MA_extremums, calc_trend, get_highest_level, \
+from lib.levels import calc_levels_by_density, calc_levels_by_MA_extremums, get_highest_level, \
     get_lowest_level, calc_level_interactions, calc_location, calc_touch_ups, calc_touch_downs, Location, Level
-from lib.trend import Trend
+from lib.trend import Trend, calc_trend
 from order import Order, create_order, OrderType
 from strategy.emitter import SignalEmitter
 from strategy.utils import parse_timedelta

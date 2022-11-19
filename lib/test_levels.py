@@ -4,9 +4,8 @@ from typing import List, Callable
 
 from broker import read_klines_from_csv
 from kline import Kline
-from lib.levels import calc_trend, calc_trend_by_extremums, calc_local_minimums, calc_local_maximums, \
+from lib.levels import calc_local_minimums, calc_local_maximums, \
     calc_levels_by_MA_extremums, get_highest_level, get_lowest_level, Level
-from lib.trend import Trend
 from strategy.levels_v1.ordermanager import calc_levels_intersection_rate
 from test_utils import datetime_from_str
 
@@ -69,35 +68,6 @@ def test_calc_local_minimums():
     assert calc_local_minimums_int([9, 7, 8]) == ([1], [7])
     assert calc_local_minimums_int([9, 7, 8, 6, 7]) == ([1, 3], [7, 6])
     assert calc_local_minimums_int([9, 7, 8, 6, 5, 7]) == ([1, 4], [7, 5])
-
-
-def test_calc_trend_by_extremums():
-    def calc_trend_by_extremums_int(window: List[int]):
-        return calc_trend_by_extremums([Decimal(x) for x in window])
-
-    assert calc_trend_by_extremums_int([5, 6, 7]) == Trend.UP
-    assert calc_trend_by_extremums_int([5, 6, 7, 8]) == Trend.UP
-    assert calc_trend_by_extremums_int([5, 7, 6, 8]) == Trend.UP
-    assert calc_trend_by_extremums_int([5, 8, 7, 8]) == Trend.UP
-    assert calc_trend_by_extremums_int([5, 9, 7, 8]) == Trend.UP
-
-    assert calc_trend_by_extremums_int([7, 6, 5]) == Trend.DOWN
-    assert calc_trend_by_extremums_int([8, 7, 6, 5]) == Trend.DOWN
-    assert calc_trend_by_extremums_int([8, 6, 7, 5]) == Trend.DOWN
-    assert calc_trend_by_extremums_int([8, 7, 8, 5]) == Trend.DOWN
-    assert calc_trend_by_extremums_int([8, 7, 9, 5]) == Trend.DOWN
-
-    assert calc_trend_by_extremums_int([7, 6, 5, 6]) == Trend.FLAT
-
-
-def test_calc_trend():
-    def calc_trend_int(window: List[int]):
-        return calc_trend([Decimal(x) for x in window])
-
-    assert calc_trend_int([5, 7, 8, 7, 8, 7]) == Trend.FLAT
-    assert calc_trend_int([5, 7, 6, 8, 7, 9]) == Trend.UP
-    assert calc_trend_int([5, 8, 7, 8, 7]) == Trend.FLAT
-    assert calc_trend_int([5, 9, 7, 8, 7]) == Trend.DOWN
 
 
 def test_calc_levels_intersection_rate():
