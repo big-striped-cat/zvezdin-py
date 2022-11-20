@@ -73,30 +73,79 @@ def calc_levels_by_density(window: List[Decimal]) -> List[Level]:
     return res
 
 
+def group_close_points(points: List[Decimal], eps: Decimal) -> List[List[int]]:
+    points_indexed = enumerate(points)
+
+    def sort_key(t: Tuple[int, Decimal]):
+        index, point = t
+        return point
+    points_indexed = sorted(points_indexed, key=sort_key)
+    res = []
+    current_level = []
+
+    for index, point in points_indexed:
+        if not current_level:
+            current_level.append(index)
+            continue
+
+        if point <= points[current_level[0]] + eps:
+            current_level.append(index)
+            continue
+
+        res.append(current_level)
+        current_level = [index]
+
+    if current_level:
+        res.append(current_level)
+
+    return res
+
+
+def deduplicate(x: List[Decimal]) -> List[Decimal]:
+    res = []
+    prev = None
+
+    for elem in x:
+        if elem != prev:
+            res.append(elem)
+            prev = elem
+            continue
+
+    return res
+
+
+def avg(x: List[Decimal]) -> Decimal:
+    return round(sum(x) / len(x), 0)
+
+
 def calc_levels_by_MA_extremums(klines: List[Kline]) -> List[Level]:
     ma_size = 3
-    radius = 20  # depends on asset, 50 for BTC
     window = [k.close for k in klines]
     ma_list = calc_MA_list(window, ma_size)
 
-    # do not use plain max(), because endpoints should be eliminated
-    # Also extremums allow detecting other levels
+    # Too much precision makes no practical sense. Also numbers look less readable.
+    # Required precision depends on asset.
+    ma_list = [round(x, 0) for x in ma_list]
+
+    # Adjacent points with very close values do not build a level.
+    # This indicates that trading was not much active this time.
+    # Treat repeating points as a single point.
+    ma_list = deduplicate(ma_list)
+
     indices_max, maximums = calc_local_maximums(ma_list)
-    # print('klines max')
-    # for i in indices_max:
-    #     print(f'{klines[i].open_time} {round(ma_list[i])}')
     indices_min, minimums = calc_local_minimums(ma_list)
-    ma_max = round(max(maximums), 0)  # precision depends on asset
-    ma_min = round(min(minimums), 0)
+    extremums = maximums + minimums
 
-    # print(f'ma_max {ma_max}')
-    level_max = (ma_max - radius, ma_max + radius)
-    level_min = (ma_min - radius, ma_min + radius)
+    # eps should be mean_price * coef, where coef is configurable
+    eps = Decimal('10')
 
-    # print(f'level_min {level_min}')
-    # print(f'level_max {level_max}')
+    groups = [g for g in group_close_points(extremums, eps) if len(g) > 1]
 
-    return [level_min, level_max]
+    levels = [avg([extremums[index] for index in g]) for g in groups]
+    levels = sorted(levels)
+
+    radius = 5  # should be configurable
+    return [(p - radius, p + radius) for p in levels]
 
 
 def get_highest_level(levels: List[Level]) -> Level:
