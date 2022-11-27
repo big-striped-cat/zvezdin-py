@@ -3,10 +3,10 @@ from datetime import datetime
 from typing import Tuple
 
 import click
-from yaml import load, Loader
 
 from backtest import backtest_strategy
 from broker import BrokerSimulator, KlineDataRange
+from config import configs
 
 from strategy.ordermanager import OrderManager
 from strategy.emitter import SignalEmitter
@@ -50,9 +50,6 @@ def backtest(strategy: str, date_from: datetime, date_to: datetime):
         date_from=date_from,
         date_to=date_to
     )
-
-    with open('config.yml') as f:
-        configs = load(f, Loader=Loader)
 
     broker = BrokerSimulator(
         kline_data_range=kline_data_range,

@@ -1,3 +1,5 @@
+tz: UTC  # for logging only
+
 broker:
   simulator:
     skip_header: true
