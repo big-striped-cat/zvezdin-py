@@ -1,4 +1,5 @@
 import enum
+import logging
 from datetime import timedelta
 from decimal import Decimal
 from typing import List, Union, Optional
@@ -10,6 +11,9 @@ from lib.trend import Trend, calc_trend
 from order import Order, create_order, OrderType
 from strategy.emitter import SignalEmitter
 from strategy.utils import parse_timedelta
+
+
+logger = logging.getLogger(__name__)
 
 
 class CalcLevelsStrategy(enum.Enum):
@@ -53,6 +57,11 @@ class JumpLevelEmitter(SignalEmitter):
         point = window[-1]
         trend = calc_trend(window)
         levels = self.calc_levels(klines)
+
+        if not levels:
+            logger.warning('No levels found for window [%s - %s].', klines[0].open_time, klines[-1].open_time)
+            return
+
         level_highest = get_highest_level(levels)
         level_lowest = get_lowest_level(levels)
 
