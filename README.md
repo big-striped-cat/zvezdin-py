@@ -48,3 +48,10 @@ Running tests
 ```shell
 pytest .
 ```
+
+For visualization purposes some xlsx charts are located in `test_data/levels`.
+There are price charts for small periods of time.
+Those charts help to understand existing tests and write new ones.
+Files are named the same as tests.
+
+Note. The price in `market_data/*.csv` files may be a little different from the price you see on exchanges.
