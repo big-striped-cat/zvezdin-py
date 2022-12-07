@@ -41,6 +41,11 @@ Run backtests for a strategy:
 python app.py backtest --strategy buy-and-hold --from 2022-02-18 --to 2022-02-26
 ```
 
+Run backtests with a custom window size:
+```shell
+python app.py backtest --strategy levels-v1 --from 2022-02-18 --to 2022-02-26 --window 100
+```
+
 ## Development
 
 Running tests

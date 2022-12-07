@@ -36,7 +36,8 @@ def init_strategy_context(strategy_name) -> Tuple[OrderManager, SignalEmitter]:
 @click.option('--strategy', required=True, help='strategy name')
 @click.option('--from', 'date_from', type=click.DateTime(), required=True, help='date from')
 @click.option('--to', 'date_to', type=click.DateTime(), required=True, help='date to')
-def backtest(strategy: str, date_from: datetime, date_to: datetime):
+@click.option('--window', 'window_size', type=int, default=1, help='kline window size')
+def backtest(strategy: str, date_from: datetime, date_to: datetime, window_size: int):
     # path = 'market_data/BTCBUSD-5m-2022-02-18.csv'
     path_template = 'market_data/BTCBUSD-5m-%Y-%m-%d.csv'
     date_from = date_from.date()
@@ -56,8 +57,8 @@ def backtest(strategy: str, date_from: datetime, date_to: datetime):
         config=configs.get('broker', {}).get('simulator', {})
     )
 
-    context_global, context_local = init_strategy_context(strategy)
-    backtest_strategy(context_global, context_local, broker)
+    order_manager, emitter = init_strategy_context(strategy)
+    backtest_strategy(order_manager, emitter, broker, window_size)
 
 
 if __name__ == '__main__':
