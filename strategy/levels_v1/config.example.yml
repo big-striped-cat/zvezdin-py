@@ -6,3 +6,5 @@ order_manager:
 emitter:
   price_open_to_level_ratio_threshold: '0.008'
   auto_close_in: '8h'
+  stop_loss_level_percent: '1'
+  profit_loss_ratio: '2'

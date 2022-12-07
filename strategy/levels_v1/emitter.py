@@ -26,7 +26,9 @@ class JumpLevelEmitter(SignalEmitter):
             self,
             price_open_to_level_ratio_threshold: Decimal = Decimal(),
             auto_close_in: timedelta = None,
-            calc_levels_strategy: CalcLevelsStrategy = CalcLevelsStrategy.by_MA_extremums
+            calc_levels_strategy: CalcLevelsStrategy = CalcLevelsStrategy.by_MA_extremums,
+            stop_loss_level_percent: Union[Decimal, str] = None,
+            profit_loss_ratio: Union[Decimal, str, int] = None
     ):
         if not isinstance(price_open_to_level_ratio_threshold, Decimal):
             price_open_to_level_ratio_threshold = Decimal(price_open_to_level_ratio_threshold)
@@ -34,8 +36,16 @@ class JumpLevelEmitter(SignalEmitter):
         if isinstance(auto_close_in, str):
             auto_close_in = parse_timedelta(auto_close_in)
 
+        if not isinstance(stop_loss_level_percent, Decimal):
+            stop_loss_level_percent = Decimal(stop_loss_level_percent)
+
+        if not isinstance(profit_loss_ratio, Decimal):
+            profit_loss_ratio = Decimal(profit_loss_ratio)
+
         self.price_open_to_level_ratio_threshold = price_open_to_level_ratio_threshold
         self.auto_close_in = auto_close_in
+        self.stop_loss_level_percent = stop_loss_level_percent
+        self.profit_loss_ratio = profit_loss_ratio
 
         # Callable[[list[Kline]], list[Level]]
         self.calc_levels = {
@@ -72,7 +82,9 @@ class JumpLevelEmitter(SignalEmitter):
                     and calc_touch_ups(interactions) >= 1 \
                     and not self.is_order_late(level, price):
                 return create_order_long(
-                    kline, level, stop_loss_level_percent=Decimal('1'), profit_loss_ratio=2,
+                    kline, level,
+                    stop_loss_level_percent=self.stop_loss_level_percent,
+                    profit_loss_ratio=self.profit_loss_ratio,
                     auto_close_in=self.auto_close_in
                 )
 
@@ -80,7 +92,9 @@ class JumpLevelEmitter(SignalEmitter):
                     and calc_touch_downs(interactions) >= 1 \
                     and not self.is_order_late(level, price):
                 return create_order_short(
-                    kline, level, stop_loss_level_percent=Decimal('1'), profit_loss_ratio=2,
+                    kline, level,
+                    stop_loss_level_percent=self.stop_loss_level_percent,
+                    profit_loss_ratio=self.profit_loss_ratio,
                     auto_close_in=self.auto_close_in
                 )
 
