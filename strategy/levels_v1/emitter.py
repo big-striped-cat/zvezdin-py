@@ -65,7 +65,10 @@ class JumpLevelEmitter(SignalEmitter):
 
         window = [k.close for k in klines]
         point = window[-1]
+
         trend = calc_trend(window)
+        logger.info('%s trend %s', kline.open_time, trend)
+
         levels = self.calc_levels(klines)
 
         if not levels:
