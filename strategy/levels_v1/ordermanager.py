@@ -43,13 +43,14 @@ class DeduplicateOrderManager(OrderManager):
         if not self.order_list.last_order:
             return True
 
-        if is_duplicate_order(
-            order,
-            self.order_list.last_order,
-            self.levels_intersection_threshold,
-            timeout=self.order_intersection_timeout
-        ):
-            return False
+        for existing_order_id, existing_order in self.order_list.orders_open.items():
+            if is_duplicate_order(
+                order,
+                existing_order,
+                self.levels_intersection_threshold,
+                timeout=self.order_intersection_timeout
+            ):
+                return False
 
         return True
 
