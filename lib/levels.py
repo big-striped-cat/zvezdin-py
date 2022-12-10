@@ -249,3 +249,9 @@ def calc_touch_ups(interactions: List[Interaction]) -> int:
         if item == LevelEntry.UP_DOWN and next_item == LevelExit.DOWN_UP:
             res += 1
     return res
+
+
+def calc_levels_variation(level_1: Level, level_2: Level) -> Decimal:
+    mid_1 = (level_1[0] + level_1[1]) / Decimal(2)
+    mid_2 = (level_2[0] + level_2[1]) / Decimal(2)
+    return abs(mid_1 / mid_2 - 1)

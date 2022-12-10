@@ -6,7 +6,8 @@ from typing import List, Union, Optional
 
 from kline import Kline
 from lib.levels import calc_levels_by_density, calc_levels_by_MA_extremums, get_highest_level, \
-    get_lowest_level, calc_level_interactions, calc_location, calc_touch_ups, calc_touch_downs, Location, Level
+    get_lowest_level, calc_level_interactions, calc_location, calc_touch_ups, calc_touch_downs, Location, Level, \
+    calc_levels_variation
 from lib.trend import Trend, calc_trend
 from order import Order, create_order, OrderType
 from strategy.emitter import SignalEmitter
@@ -30,7 +31,8 @@ class JumpLevelEmitter(SignalEmitter):
             stop_loss_level_percent: Union[Decimal, str] = None,
             profit_loss_ratio: Union[Decimal, str, int] = None,
             medium_window_size: int = None,
-            small_window_size: int = None
+            small_window_size: int = None,
+            min_levels_variation: Union[Decimal, str] = None
     ):
         if not isinstance(price_open_to_level_ratio_threshold, Decimal):
             price_open_to_level_ratio_threshold = Decimal(price_open_to_level_ratio_threshold)
@@ -50,6 +52,7 @@ class JumpLevelEmitter(SignalEmitter):
         self.profit_loss_ratio = profit_loss_ratio
         self.medium_window_size = medium_window_size
         self.small_window_size = small_window_size
+        self.min_levels_variation = Decimal(min_levels_variation)
 
         # Callable[[list[Kline]], list[Level]]
         self.calc_levels = {
@@ -92,12 +95,17 @@ class JumpLevelEmitter(SignalEmitter):
         level_highest = get_highest_level(levels)
         level_lowest = get_lowest_level(levels)
 
+        if calc_levels_variation(level_lowest, level_highest) < self.min_levels_variation:
+            logger.warning('Levels are too close. Order signal will not be emitted.')
+            return
+
         for level in (level_lowest, level_highest):
             interactions = calc_level_interactions(small_window_points, level)
 
             if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level) == Location.UP \
                     and calc_touch_ups(interactions) >= 1 \
-                    and not self.is_order_late(level, price):
+                    and not self.is_order_late(level, price) \
+                    and level == level_lowest:
                 return create_order_long(
                     kline, level,
                     stop_loss_level_percent=self.stop_loss_level_percent,
@@ -107,7 +115,8 @@ class JumpLevelEmitter(SignalEmitter):
 
             if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level) == Location.DOWN \
                     and calc_touch_downs(interactions) >= 1 \
-                    and not self.is_order_late(level, price):
+                    and not self.is_order_late(level, price) \
+                    and level == level_highest:
                 return create_order_short(
                     kline, level,
                     stop_loss_level_percent=self.stop_loss_level_percent,
