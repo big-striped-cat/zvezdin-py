@@ -29,6 +29,7 @@ class JumpLevelEmitter(SignalEmitter):
             calc_levels_strategy: CalcLevelsStrategy = CalcLevelsStrategy.by_MA_extremums,
             stop_loss_level_percent: Union[Decimal, str] = None,
             profit_loss_ratio: Union[Decimal, str, int] = None,
+            medium_window_size: int = None,
             small_window_size: int = None
     ):
         if not isinstance(price_open_to_level_ratio_threshold, Decimal):
@@ -47,6 +48,7 @@ class JumpLevelEmitter(SignalEmitter):
         self.auto_close_in = auto_close_in
         self.stop_loss_level_percent = stop_loss_level_percent
         self.profit_loss_ratio = profit_loss_ratio
+        self.medium_window_size = medium_window_size
         self.small_window_size = small_window_size
 
         # Callable[[list[Kline]], list[Level]]
@@ -65,28 +67,33 @@ class JumpLevelEmitter(SignalEmitter):
         # close price of previous kline is current price
         price = kline.close
 
-        # Finding trend and levels requires medium-sized window.
-        window = [k.close for k in klines]
-        point = window[-1]
+        # Finding trend requires medium-sized window.
+        medium_window = klines[-self.medium_window_size:]
+        medium_window_points = [k.close for k in medium_window]
 
-        trend = calc_trend(window)
+        # Choose smaller window to calc level interactions.
+        # We are interested in interactions in close surrounding of current kline.
+        small_window = klines[-self.small_window_size:]
+        small_window_points = [k.close for k in small_window]
+
+        point = medium_window_points[-1]
+
+        trend = calc_trend(medium_window_points)
         logger.info('%s trend %s', kline.open_time, trend)
 
-        levels = self.calc_levels(klines)
+        levels = self.calc_levels(small_window)
 
         if not levels:
-            logger.warning('No levels found for window [%s - %s].', klines[0].open_time, klines[-1].open_time)
+            logger.warning('No levels found for window [%s - %s].',
+                           small_window[0].open_time,
+                           small_window[-1].open_time)
             return
 
         level_highest = get_highest_level(levels)
         level_lowest = get_lowest_level(levels)
 
-        # Choose smaller window to calc level interactions.
-        # We are interested in interactions in close surrounding of current kline.
-        small_window = window[-self.small_window_size:]
-
         for level in (level_lowest, level_highest):
-            interactions = calc_level_interactions(small_window, level)
+            interactions = calc_level_interactions(small_window_points, level)
 
             if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level) == Location.UP \
                     and calc_touch_ups(interactions) >= 1 \

@@ -8,4 +8,5 @@ emitter:
   auto_close_in: '8h'
   stop_loss_level_percent: '1'
   profit_loss_ratio: '2'
+  medium_window_size: 100
   small_window_size: 30
