@@ -2,7 +2,7 @@ import enum
 import logging
 from datetime import timedelta
 from decimal import Decimal
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Tuple
 
 from kline import Kline
 from lib.levels import calc_levels_by_density, calc_levels_by_MA_extremums, get_highest_level, \
@@ -32,6 +32,8 @@ class JumpLevelEmitter(SignalEmitter):
             profit_loss_ratio: Union[Decimal, str, int] = None,
             medium_window_size: int = None,
             small_window_size: int = None,
+            levels_window_size_min: int = None,
+            levels_window_size_max: int = None,
             min_levels_variation: Union[Decimal, str] = None
     ):
         if not isinstance(price_open_to_level_ratio_threshold, Decimal):
@@ -52,6 +54,8 @@ class JumpLevelEmitter(SignalEmitter):
         self.profit_loss_ratio = profit_loss_ratio
         self.medium_window_size = medium_window_size
         self.small_window_size = small_window_size
+        self.levels_window_size_min = levels_window_size_min
+        self.levels_window_size_max = levels_window_size_max
         self.min_levels_variation = Decimal(min_levels_variation)
 
         # Callable[[list[Kline]], list[Level]]
@@ -70,12 +74,9 @@ class JumpLevelEmitter(SignalEmitter):
         # close price of previous kline is current price
         price = kline.close
 
-        # Finding trend requires medium-sized window.
         medium_window = klines[-self.medium_window_size:]
         medium_window_points = [k.close for k in medium_window]
 
-        # Choose smaller window to calc level interactions.
-        # We are interested in interactions in close surrounding of current kline.
         small_window = klines[-self.small_window_size:]
         small_window_points = [k.close for k in small_window]
 
@@ -84,22 +85,26 @@ class JumpLevelEmitter(SignalEmitter):
         trend = calc_trend(medium_window_points)
         logger.info('%s trend %s', kline.open_time, trend)
 
-        levels = self.calc_levels(small_window)
+        window_size = self.find_optimal_window_size(
+            klines,
+            self.levels_window_size_min,
+            self.levels_window_size_max
+        )
 
-        if not levels:
-            logger.warning('No levels found for window [%s - %s].',
-                           small_window[0].open_time,
-                           small_window[-1].open_time)
+        if not window_size:
+            logger.warning('Optimal window not found')
             return
+
+        window = klines[-window_size:]
+        levels = self.calc_levels(window)
 
         level_highest = get_highest_level(levels)
         level_lowest = get_lowest_level(levels)
 
-        if calc_levels_variation(level_lowest, level_highest) < self.min_levels_variation:
-            logger.warning('Levels are too close. Order signal will not be emitted.')
-            return
-
         for level in (level_lowest, level_highest):
+            # It's important that the price interacted with level right before the trading moment
+            # It means the level is relevant
+            # That's why I take small window to calc interactions
             interactions = calc_level_interactions(small_window_points, level)
 
             if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level) == Location.UP \
@@ -123,6 +128,65 @@ class JumpLevelEmitter(SignalEmitter):
                     profit_loss_ratio=self.profit_loss_ratio,
                     auto_close_in=self.auto_close_in
                 )
+
+    def find_optimal_window_size(self, klines: List[Kline], start_size: int, max_size: int) -> Optional[int]:
+        """
+        I need at least 2 levels which differ significally. This allows to find trade moment and trade direction.
+
+        Problem: if the window I take is too small, then no levels will be detected. Or just 1 level will be detected.
+        Or some very close levels will be detected.
+        On the other side if the window is too large then irrelevant levels appear.
+
+        Function `find_optimal_window_size` looks for minimal interval which gives at least 2 essentially different levels.
+
+        :param klines: required `len(klines) >= max_size`
+        :param start_size:
+        :param max_size:
+        :return: optimal window size
+        """
+        if len(klines) < max_size:
+            logger.warning('Klines list is too small for finding optimal window')
+
+        size = 0
+        iteration = 0
+        message = ''
+        window = []
+
+        while size <= max_size:
+            iteration += 1
+            size = start_size * iteration
+
+            window = klines[-size:]
+            levels = self.calc_levels(window)
+
+            ok, message = self.contains_2_levels(levels)
+            if ok:
+                return size
+
+        if message and window:
+            logger.warning(
+                '%s for window [%s - %s]',
+                message,
+                window[0].open_time,
+                window[-1].open_time
+            )
+
+        return None
+
+    def contains_2_levels(self, levels: List[Level]) -> Tuple[bool, str]:
+        """
+        Checks that `levels` contains at least 2 essentially different levels.
+        """
+        if not levels:
+            return False, 'No levels'
+
+        level_highest = get_highest_level(levels)
+        level_lowest = get_lowest_level(levels)
+
+        if calc_levels_variation(level_lowest, level_highest) < self.min_levels_variation:
+            return False, 'Levels are too close'
+
+        return True, ''
 
     def is_order_late(self, level: Level, price: Decimal) -> bool:
         level_mid = (level[0] + level[1]) / 2
