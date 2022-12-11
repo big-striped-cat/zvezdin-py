@@ -34,7 +34,8 @@ class JumpLevelEmitter(SignalEmitter):
             small_window_size: int = None,
             levels_window_size_min: int = None,
             levels_window_size_max: int = None,
-            min_levels_variation: Union[Decimal, str] = None
+            min_levels_variation: Union[Decimal, str] = None,
+            calc_trend_on: bool = True
     ):
         if not isinstance(price_open_to_level_ratio_threshold, Decimal):
             price_open_to_level_ratio_threshold = Decimal(price_open_to_level_ratio_threshold)
@@ -57,6 +58,7 @@ class JumpLevelEmitter(SignalEmitter):
         self.levels_window_size_min = levels_window_size_min
         self.levels_window_size_max = levels_window_size_max
         self.min_levels_variation = Decimal(min_levels_variation)
+        self.calc_trend_on = calc_trend_on
 
         # Callable[[list[Kline]], list[Level]]
         self.calc_levels = {
@@ -82,7 +84,11 @@ class JumpLevelEmitter(SignalEmitter):
 
         point = medium_window_points[-1]
 
-        trend = calc_trend(medium_window_points)
+        if self.calc_trend_on:
+            trend = calc_trend(medium_window_points)
+        else:
+            trend = Trend.FLAT
+
         logger.info('%s trend %s', kline.open_time, trend)
 
         window_size = self.find_optimal_window_size(
