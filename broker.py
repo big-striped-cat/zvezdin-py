@@ -1,5 +1,6 @@
 import csv
 import enum
+import logging
 from dataclasses import dataclass
 from datetime import date, timedelta, datetime
 from decimal import Decimal
@@ -9,6 +10,8 @@ import pytz
 
 from kline import Kline
 from order import Order, OrderId
+
+logger = logging.getLogger(__name__)
 
 
 class BrokerEventType(enum.Enum):
@@ -44,14 +47,17 @@ class BrokerSimulator(Broker):
     def __init__(
         self,
         klines_csv_path: Optional[str] = None,
-        kline_data_range: Optional['KlineDataRange'] = None
+        kline_data_range: Optional['KlineDataRange'] = None,
+        config=None
     ):
         assert klines_csv_path or kline_data_range
         path_iter = (klines_csv_path,) if klines_csv_path else kline_data_range.path_iter()
 
+        self.config = config or {}
+
         self._klines = get_klines_iter(
             path_iter,
-            skip_header=False,
+            skip_header=self.config.get('skip_header', True),
             timeframe=timedelta(minutes=5)
         )
 
@@ -93,6 +99,17 @@ class BrokerSimulator(Broker):
         order = self.orders[order_id]
 
         if is_take_profit_achieved(kline, order) and is_stop_loss_achieved(kline, order):
+            logger.warning('Undefined behaviour for order %s. Take profit and stop loss both achieved.', order_id)
+            logger.info('take_profit_stop_loss_both_achieved strategy: %s',
+                        self.config.get('take_profit_stop_loss_both_achieved'))
+
+            if self.config.get('take_profit_stop_loss_both_achieved') == 'close_by_stop_loss':
+                return BrokerEvent(
+                    order_id=order_id,
+                    type=BrokerEventType.order_close_by_stop_loss,
+                    created_at=kline.open_time,
+                    price=order.price_stop_loss
+                )
             raise Exception('Undefined behaviour. Take profit and stop loss both achieved.')
 
         if is_take_profit_achieved(kline, order):

@@ -6,3 +6,11 @@ order_manager:
 emitter:
   price_open_to_level_ratio_threshold: '0.008'
   auto_close_in: '8h'
+  stop_loss_level_percent: '1'
+  profit_loss_ratio: '2'
+  medium_window_size: 100
+  small_window_size: 30
+  levels_window_size_min: 50
+  levels_window_size_max: 200
+  min_levels_variation: '0.004'
+  calc_trend_on: false

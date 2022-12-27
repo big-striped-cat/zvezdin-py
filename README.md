@@ -6,6 +6,12 @@ The platform is supposed for backtesting and running trading strategies.
 
 ## Configuring a strategy
 
+First create global config:
+
+```shell
+cp config.example.yml config.yml
+```
+
 Strategies are located in strategy/ dir. There are some built-in strategies:
 
 * buy-and-hold strategy. Can be configured to sell and hold also.
@@ -35,6 +41,11 @@ Run backtests for a strategy:
 python app.py backtest --strategy buy-and-hold --from 2022-02-18 --to 2022-02-26
 ```
 
+Run backtests with a custom window size:
+```shell
+python app.py backtest --strategy levels-v1 --from 2022-02-18 --to 2022-02-26 --window 100
+```
+
 ## Development
 
 Running tests
@@ -42,3 +53,10 @@ Running tests
 ```shell
 pytest .
 ```
+
+For visualization purposes some xlsx charts are located in `test_data/levels`.
+There are price charts for small periods of time.
+Those charts help to understand existing tests and write new ones.
+Files are named the same as tests.
+
+Note. The price in `market_data/*.csv` files may be a little different from the price you see on exchanges.

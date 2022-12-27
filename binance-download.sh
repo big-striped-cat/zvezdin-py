@@ -7,4 +7,4 @@ filename=$1
 mkdir -p market_data
 curl https://data.binance.vision/data/futures/um/daily/klines/BTCBUSD/5m/${filename}.zip -o ${filename}.zip
 unzip -o ${filename}.zip -d market_data
-mv ${filename}.zip market_data/
+rm ${filename}.zip

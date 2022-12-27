@@ -3,11 +3,11 @@ from typing import Optional, Union
 
 from _datetime import timedelta
 
+from lib.trend import Trend
 from order import Order, OrderType
 from orderlist import OrderList
 from strategy.ordermanager import OrderManager
 from strategy.utils import parse_timedelta
-from trend import Trend
 
 
 class DeduplicateOrderManager(OrderManager):
@@ -43,13 +43,14 @@ class DeduplicateOrderManager(OrderManager):
         if not self.order_list.last_order:
             return True
 
-        if is_duplicate_order(
-            order,
-            self.order_list.last_order,
-            self.levels_intersection_threshold,
-            timeout=self.order_intersection_timeout
-        ):
-            return False
+        for existing_order_id, existing_order in self.order_list.orders_open.items():
+            if is_duplicate_order(
+                order,
+                existing_order,
+                self.levels_intersection_threshold,
+                timeout=self.order_intersection_timeout
+            ):
+                return False
 
         return True
 

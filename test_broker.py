@@ -3,7 +3,7 @@ from decimal import Decimal
 from broker import BrokerSimulator, BrokerEvent, BrokerEventType
 from order import TradeType, OrderType
 from test_kline import kline_factory
-from strategy.levels_v1.test_strategy import trade_factory, order_factory
+from factories import trade_factory, order_factory
 
 
 class TestBrokerSimulatorEvents:
