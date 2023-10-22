@@ -16,7 +16,8 @@ class DeduplicateOrderManager(OrderManager):
         order_list: OrderList,
         trend: Union[Trend, str] = None,
         levels_intersection_threshold: Union[Decimal, str] = Decimal(),
-        order_intersection_timeout: Union[timedelta, str] = timedelta()
+        order_intersection_timeout: Union[timedelta, str] = timedelta(),
+        allow_parallel_orders: bool = False
     ):
         super().__init__(order_list)
 
@@ -33,15 +34,24 @@ class DeduplicateOrderManager(OrderManager):
 
         self.levels_intersection_threshold = levels_intersection_threshold
         self.order_intersection_timeout = order_intersection_timeout
+        self.allow_parallel_orders = allow_parallel_orders
 
-    def is_order_acceptable(self, order: Order):
+    def is_order_acceptable(self, order: Order) -> tuple[bool, list[int]]:
         if self.trend == Trend.DOWN and order.order_type == OrderType.LONG:
-            return False
+            return False, []
         if self.trend == Trend.UP and order.order_type == OrderType.SHORT:
-            return False
+            return False, []
 
-        if not self.order_list.last_order:
-            return True
+        if not self.order_list.orders_open:
+            return True, []
+
+        if not self.allow_parallel_orders:
+            for prev_order in self.order_list.orders_open.values():
+                delta = order.trade_open.created_at - prev_order.trade_open.created_at
+                if delta <= self.order_intersection_timeout:
+                    return False, []
+
+            return True, list(self.order_list.orders_open.keys())
 
         for existing_order_id, existing_order in self.order_list.orders_open.items():
             if is_duplicate_order(
@@ -50,9 +60,9 @@ class DeduplicateOrderManager(OrderManager):
                 self.levels_intersection_threshold,
                 timeout=self.order_intersection_timeout
             ):
-                return False
+                return False, []
 
-        return True
+        return True, []
 
 
 def is_duplicate_order(

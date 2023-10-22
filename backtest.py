@@ -28,7 +28,7 @@ def backtest_strategy(
         kline = kline_window[-1]
 
         for order_id in local_broker.find_orders_for_auto_close(kline.open_time):
-            logger.info('Order id=%s will be auto closed', order_id)
+            logger.info('Order id=%s will be auto closed because of timeout', order_id)
 
             event = broker.close_order(order_id, kline)
             local_broker.handle_remote_event(event)
@@ -55,7 +55,13 @@ def backtest_strategy(
         if not order:
             continue
 
-        if order_manager.is_order_acceptable(order):
+        is_acceptable, order_ids_to_close = order_manager.is_order_acceptable(order)
+        if is_acceptable:
+            for order_id in order_ids_to_close:
+                logger.info('order id=%s will be closed because another order was created', order_id)
+                event = broker.close_order(order_id, kline)
+                local_broker.handle_remote_event(event)
+
             event = broker.add_order(order)
             local_broker.add_order(event.order_id, order)
 
