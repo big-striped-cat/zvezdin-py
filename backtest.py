@@ -36,12 +36,18 @@ def backtest_strategy(
         for event in broker.events(kline):
             local_broker.handle_remote_event(event)
 
+        prev_cooldown = detector.cooldown
         if detector.detect(kline_window):
-            logger.warning('Emergency detected')
+            if not prev_cooldown:
+                logger.warning('Emergency detected at %s', kline.open_time)
             continue
 
         if detector.cooldown:
-            logger.warning('Emergency detector cooling down')
+            logger.debug('Emergency detector cooling down')
+            continue
+
+        if prev_cooldown:
+            logger.info('Emergency has ended at %s', kline.open_time)
             continue
 
         # pass historical klines

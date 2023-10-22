@@ -35,7 +35,8 @@ class JumpLevelEmitter(SignalEmitter):
             levels_window_size_min: int = None,
             levels_window_size_max: int = None,
             min_levels_variation: Union[Decimal, str] = None,
-            calc_trend_on: bool = True
+            calc_trend_on: bool = True,
+            logging_settings: Optional[dict] = None
     ):
         if not isinstance(price_open_to_level_ratio_threshold, Decimal):
             price_open_to_level_ratio_threshold = Decimal(price_open_to_level_ratio_threshold)
@@ -66,6 +67,8 @@ class JumpLevelEmitter(SignalEmitter):
             CalcLevelsStrategy.by_MA_extremums: calc_levels_by_MA_extremums,
         }[calc_levels_strategy]
 
+        self.logging_settings = logging_settings or {}
+
     def get_order_request(self, klines: List[Kline]) -> Optional[Order]:
         """
         :param klines: historical klines. Current kline open price equals to klines[-1].close
@@ -89,7 +92,8 @@ class JumpLevelEmitter(SignalEmitter):
         else:
             trend = Trend.FLAT
 
-        logger.info('%s trend %s', kline.open_time, trend)
+        if self.logging_settings.get('trend'):
+            logger.info('%s trend %s', kline.open_time, trend)
 
         window_size = self.find_optimal_window_size(
             klines,
