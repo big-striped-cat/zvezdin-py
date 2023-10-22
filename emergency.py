@@ -23,15 +23,7 @@ class EmergencyDetector:
     def detect(self, klines: List[Kline]) -> bool:
         amplitudes = [abs(k.high - k.low) for k in klines]
 
-        if amplitudes[-1] > 8 * median(amplitudes[-10:]):
-            self.cooldown = self.cooldown_max
-            return True
-
-        if mean(amplitudes[-3:]) > 5 * median(amplitudes[-20:]):
-            self.cooldown = self.cooldown_max
-            return True
-
-        if mean(amplitudes[-5:]) > 5 * median(amplitudes[-50:]):
+        if amplitudes[-1] > 12 * median(amplitudes[-10:]):
             self.cooldown = self.cooldown_max
             return True
 
