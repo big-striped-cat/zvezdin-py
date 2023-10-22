@@ -14,5 +14,6 @@ emitter:
   levels_window_size_max: 200
   min_levels_variation: '0.004'
   calc_trend_on: false
+  min_level_interactions: 10
   logging_settings:
     trend: false

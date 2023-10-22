@@ -36,6 +36,7 @@ class JumpLevelEmitter(SignalEmitter):
             levels_window_size_max: int = None,
             min_levels_variation: Union[Decimal, str] = None,
             calc_trend_on: bool = True,
+            min_level_interactions: int = 10,
             logging_settings: Optional[dict] = None
     ):
         if not isinstance(price_open_to_level_ratio_threshold, Decimal):
@@ -60,6 +61,7 @@ class JumpLevelEmitter(SignalEmitter):
         self.levels_window_size_max = levels_window_size_max
         self.min_levels_variation = Decimal(min_levels_variation)
         self.calc_trend_on = calc_trend_on
+        self.min_level_interactions = min_level_interactions
 
         # Callable[[list[Kline]], list[Level]]
         self.calc_levels = {
@@ -118,7 +120,7 @@ class JumpLevelEmitter(SignalEmitter):
             interactions = calc_level_interactions(small_window_points, level)
 
             if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level) == Location.UP \
-                    and calc_touch_ups(interactions) >= 1 \
+                    and len(interactions) >= self.min_level_interactions \
                     and not self.is_order_late(level, price) \
                     and level == level_lowest:
                 return create_order_long(
@@ -129,7 +131,7 @@ class JumpLevelEmitter(SignalEmitter):
                 )
 
             if trend in (Trend.DOWN, Trend.FLAT) and calc_location(point, level) == Location.DOWN \
-                    and calc_touch_downs(interactions) >= 1 \
+                    and len(interactions) >= self.min_level_interactions \
                     and not self.is_order_late(level, price) \
                     and level == level_highest:
                 return create_order_short(
