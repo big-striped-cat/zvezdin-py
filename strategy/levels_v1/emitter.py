@@ -30,8 +30,8 @@ class JumpLevelEmitter(SignalEmitter):
             calc_levels_strategy: CalcLevelsStrategy = CalcLevelsStrategy.by_MA_extremums,
             stop_loss_level_percent: Union[Decimal, str] = None,
             profit_loss_ratio: Union[Decimal, str, int] = None,
-            medium_window_size: int = None,
-            small_window_size: int = None,
+            trend_window_size: int = None,
+            interactions_window_size: int = None,
             levels_window_size_min: int = None,
             levels_window_size_max: int = None,
             min_levels_variation: Union[Decimal, str] = None,
@@ -55,8 +55,8 @@ class JumpLevelEmitter(SignalEmitter):
         self.auto_close_in = auto_close_in
         self.stop_loss_level_percent = stop_loss_level_percent
         self.profit_loss_ratio = profit_loss_ratio
-        self.medium_window_size = medium_window_size
-        self.small_window_size = small_window_size
+        self.trend_window_size = trend_window_size
+        self.interactions_window_size = interactions_window_size
         self.levels_window_size_min = levels_window_size_min
         self.levels_window_size_max = levels_window_size_max
         self.min_levels_variation = Decimal(min_levels_variation)
@@ -81,16 +81,16 @@ class JumpLevelEmitter(SignalEmitter):
         # close price of previous kline is current price
         price = kline.close
 
-        medium_window = klines[-self.medium_window_size:]
-        medium_window_points = [k.close for k in medium_window]
+        trend_window = klines[-self.trend_window_size:]
+        trend_window_points = [k.close for k in trend_window]
 
-        small_window = klines[-self.small_window_size:]
-        small_window_points = [k.close for k in small_window]
+        interactions_window = klines[-self.interactions_window_size:]
+        interactions_window_points = [k.close for k in interactions_window]
 
-        point = medium_window_points[-1]
+        point = trend_window_points[-1]
 
         if self.calc_trend_on:
-            trend = calc_trend(medium_window_points)
+            trend = calc_trend(trend_window_points)
         else:
             trend = Trend.FLAT
 
@@ -116,8 +116,8 @@ class JumpLevelEmitter(SignalEmitter):
         for level in (level_lowest, level_highest):
             # It's important that the price interacted with level right before the trading moment
             # It means the level is relevant
-            # That's why I take small window to calc interactions
-            interactions = calc_level_interactions(small_window_points, level)
+            # That's why I take interactions window to calc interactions
+            interactions = calc_level_interactions(interactions_window_points, level)
 
             if trend in (Trend.UP, Trend.FLAT) and calc_location(point, level) == Location.UP \
                     and len(interactions) >= self.min_level_interactions \
@@ -145,7 +145,7 @@ class JumpLevelEmitter(SignalEmitter):
         """
         I need at least 2 levels which differ significally. This allows to find trade moment and trade direction.
 
-        Problem: if the window I take is too small, then no levels will be detected. Or just 1 level will be detected.
+        Problem: if the window I take is too interactions, then no levels will be detected. Or just 1 level will be detected.
         Or some very close levels will be detected.
         On the other side if the window is too large then irrelevant levels appear.
 
@@ -157,7 +157,7 @@ class JumpLevelEmitter(SignalEmitter):
         :return: optimal window size
         """
         if len(klines) < max_size:
-            logger.warning('Klines list is too small for finding optimal window')
+            logger.warning('Klines list is too interactions for finding optimal window')
 
         size = 0
         iteration = 0
