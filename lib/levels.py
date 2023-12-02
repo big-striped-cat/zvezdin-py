@@ -8,7 +8,7 @@ from lib.indicators import calc_MA_list
 
 
 def calc_local_extremums(
-        window: List[Decimal], compare: Callable[[Decimal, Decimal], int], radius: int = 1
+    window: List[Decimal], compare: Callable[[Decimal, Decimal], int], radius: int = 1
 ) -> tuple[list[int], list[Decimal]]:
     indices = []
     # Exclude endpoints, because they can result in wrong extremums
@@ -25,14 +25,18 @@ def calc_local_extremums(
     return indices, extremums
 
 
-def calc_local_maximums(window: List[Decimal], radius: int = 1) -> tuple[list[int], list[Decimal]]:
+def calc_local_maximums(
+    window: List[Decimal], radius: int = 1
+) -> tuple[list[int], list[Decimal]]:
     def compare(a, b):
         return b - a
 
     return calc_local_extremums(window, compare, radius=radius)
 
 
-def calc_local_minimums(window: List[Decimal], radius: int = 1) -> tuple[list[int], list[Decimal]]:
+def calc_local_minimums(
+    window: List[Decimal], radius: int = 1
+) -> tuple[list[int], list[Decimal]]:
     def compare(a, b):
         return a - b
 
@@ -55,7 +59,9 @@ def calc_levels_by_density(window: List[Decimal]) -> List[Level]:
         sector_index = (point - value_min) // sector_len
         points_by_sector_count[sector_index] += 1
 
-    points_by_sector_sorted = sorted(points_by_sector_count.items(), key=lambda t: t[1], reverse=True)
+    points_by_sector_sorted = sorted(
+        points_by_sector_count.items(), key=lambda t: t[1], reverse=True
+    )
     levels_count = 5
     top_sectors = points_by_sector_sorted[:levels_count]
 
@@ -79,6 +85,7 @@ def group_close_points(points: List[Decimal], eps: Decimal) -> List[List[int]]:
     def sort_key(t: Tuple[int, Decimal]):
         index, point = t
         return point
+
     points_indexed = sorted(points_indexed, key=sort_key)
     res = []
     current_level = []
@@ -137,7 +144,7 @@ def calc_levels_by_MA_extremums(klines: List[Kline]) -> List[Level]:
     extremums = maximums + minimums
 
     # eps should be mean_price * coef, where coef is configurable
-    eps = Decimal('10')
+    eps = Decimal("10")
 
     groups = [g for g in group_close_points(extremums, eps) if len(g) > 1]
 

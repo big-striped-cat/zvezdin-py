@@ -11,10 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 def backtest_strategy(
-        order_manager: OrderManager,
-        emitter: SignalEmitter,
-        broker: Broker,
-        window_size: int
+    order_manager: OrderManager,
+    emitter: SignalEmitter,
+    broker: Broker,
+    window_size: int,
 ):
     order_list = order_manager.order_list
     local_broker = LocalBroker(order_list)
@@ -31,7 +31,7 @@ def backtest_strategy(
         # now window consists of `window_size` historical klines and one current kline
 
         for order_id in local_broker.find_orders_for_auto_close(kline.open_time):
-            logger.info('Order id=%s will be auto closed because of timeout', order_id)
+            logger.info("Order id=%s will be auto closed because of timeout", order_id)
 
             event = broker.close_order(order_id, kline)
             local_broker.handle_remote_event(event)
@@ -40,7 +40,7 @@ def backtest_strategy(
             local_broker.handle_remote_event(event)
 
         if detector.detect(kline_window):
-            logger.warning('Emergency detected at %s', kline.open_time)
+            logger.warning("Emergency detected at %s", kline.open_time)
             kline_window = []
             continue
 
@@ -52,22 +52,27 @@ def backtest_strategy(
         is_acceptable, order_ids_to_close = order_manager.is_order_acceptable(order)
         if is_acceptable:
             for order_id in order_ids_to_close:
-                logger.info('order id=%s will be closed because another order was created', order_id)
+                logger.info(
+                    "order id=%s will be closed because another order was created",
+                    order_id,
+                )
                 event = broker.close_order(order_id, kline)
                 local_broker.handle_remote_event(event)
 
             event = broker.add_order(order)
-            local_broker.add_order(event.order_id, order)
+            local_broker.add_order(event, order)
 
         kline_window.pop(0)
 
-    if len(kline_window) < window_size:
-        raise RuntimeError('Not enough klines')
+    if not kline:
+        raise RuntimeError("No klines")
 
     last_price = kline.close
 
-    logger.info(f'total orders open: {len(order_list.orders_open)}')
-    logger.info(f'total orders closed: {len(order_list.orders_closed)}')
+    logger.info(f"total orders open: {len(order_list.orders_open)}")
+    logger.info(f"total orders closed: {len(order_list.orders_closed)}")
 
-    logger.info(f'profit/loss on closed orders: {order_list.profit()}')
-    logger.info(f'profit/loss on open orders: {order_list.profit_unrealized(last_price)}')
+    logger.info(f"profit/loss on closed orders: {order_list.profit()}")
+    logger.info(
+        f"profit/loss on open orders: {order_list.profit_unrealized(last_price)}"
+    )

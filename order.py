@@ -3,7 +3,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 from _datetime import timedelta
 
@@ -19,8 +19,8 @@ class OrderType(enum.Enum):
 
     def __str__(self):
         return {
-            OrderType.LONG: 'long',
-            OrderType.SHORT: 'short',
+            OrderType.LONG: "long",
+            OrderType.SHORT: "short",
         }[self]
 
 
@@ -30,8 +30,8 @@ class TradeType(enum.Enum):
 
     def __str__(self):
         return {
-            TradeType.BUY: 'buy',
-            TradeType.SELL: 'sell',
+            TradeType.BUY: "buy",
+            TradeType.SELL: "sell",
         }[self]
 
 
@@ -48,37 +48,46 @@ class Trade:
 
 @dataclass
 class Order:
+    id: Optional[int]
     order_type: OrderType
+    amount: Decimal
     trade_open: Trade
     trade_close: Optional[Trade]
     level: Level
-    price_take_profit: Decimal
+    price_take_profit: Optional[Decimal]
     price_stop_loss: Decimal
     auto_close_in: Optional[timedelta]
+    sub_orders: Optional[List["Order"]]
 
-    def get_profit(self, trade_close: Optional[Trade] = None):
-        trade_close = trade_close or self.trade_close
-        profit = trade_close.value() - self.trade_open.value()
-        return {
-            OrderType.LONG: profit,
-            OrderType.SHORT: -profit,
-        }[self.order_type]
+    def get_profit(self, trade_close: Optional[Trade] = None) -> Decimal:
+        if self.sub_orders is None:
+            trade_close = trade_close or self.trade_close
+            profit = trade_close.value() - self.trade_open.value()
+            return {
+                OrderType.LONG: profit,
+                OrderType.SHORT: -profit,
+            }[self.order_type]
 
-    def get_profit_unrealized(self, price: Decimal):
+        return sum((sub_order.get_profit() for sub_order in self.sub_orders), Decimal())
+
+    def get_profit_unrealized(self, price: Decimal) -> Decimal:
         trade_close = Trade(
             type=get_trade_close_type(self.order_type),
             price=price,
             amount=self.trade_open.amount,
-            created_at=datetime.now()  # dummy time
+            created_at=datetime.now(),  # dummy time
         )
         return self.get_profit(trade_close=trade_close)
 
-    def is_profit(self):
+    def is_profit(self) -> bool:
         return self.get_profit() > 0
 
     @property
-    def is_closed(self):
-        return self.trade_close is not None
+    def is_closed(self) -> bool:
+        if self.sub_orders is None:
+            return self.trade_close is not None
+
+        return all([sub_order.is_closed for sub_order in self.sub_orders])
 
 
 def get_trade_open_type(order_type: OrderType) -> TradeType:
@@ -96,29 +105,40 @@ def get_trade_close_type(order_type: OrderType) -> TradeType:
 
 
 def create_order(
-        order_type: OrderType, kline: Kline, level: Level,
-        price_take_profit=None, price_stop_loss=None, auto_close_in=None
-        ) -> Order:
+    order_type: OrderType,
+    kline: Kline,
+    level: Level,
+    amount: Decimal = Decimal(1),
+    price_take_profit=None,
+    price_stop_loss=None,
+    auto_close_in=None,
+    sub_orders: Optional[list[Order]] = None,
+) -> Order:
     price_take_profit = price_take_profit or Decimal()
     price_stop_loss = price_stop_loss or Decimal()
 
     trade_type = get_trade_open_type(order_type)
+    trade_open = None
 
-    trade_open = Trade(
-        type=trade_type,
-        price=kline.close,
-        amount=Decimal(1),
-        created_at=kline.close_time
-    )
+    if sub_orders is not None:
+        trade_open = Trade(
+            type=trade_type,
+            price=kline.close,
+            amount=amount,
+            created_at=kline.close_time,
+        )
 
     return Order(
+        id=None,
         order_type=order_type,
+        amount=amount,
         trade_open=trade_open,
         trade_close=None,
         level=level,
         price_take_profit=price_take_profit,
         price_stop_loss=price_stop_loss,
-        auto_close_in=auto_close_in
+        auto_close_in=auto_close_in,
+        sub_orders=sub_orders,
     )
 
 

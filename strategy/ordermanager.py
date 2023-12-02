@@ -3,10 +3,7 @@ from orderlist import OrderList
 
 
 class OrderManager:
-    def __init__(
-        self,
-        order_list: OrderList = None
-    ):
+    def __init__(self, order_list: OrderList = None):
         self.order_list = order_list or OrderList()
 
     def is_order_acceptable(self, order: Order) -> tuple[bool, list[int]]:

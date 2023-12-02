@@ -17,6 +17,4 @@ class ConstantEmitter(SignalEmitter):
         kline = klines[-1]
         level = (kline.close, kline.close)
 
-        return create_order(
-            self.order_type, kline, level
-        )
+        return create_order(self.order_type, kline, level)

@@ -18,24 +18,35 @@ class LocalBroker:
     * implements order auto close after given period of time
     * does NOT make trading decisions
     """
+
     def __init__(self, order_list: OrderList):
         self.order_list = order_list
 
-    def add_order(self, order_id: OrderId, order: Order):
-        self.order_list.add_order(order_id, order)\
+    def add_order(self, event: BrokerEvent, order: Order):
+        self.order_list.add_order(event.order_id, order)
 
-        self.log_order_opened(order_id)
+        self.log_order_opened(event.order_id)
+
+        if event.sub_events:
+            for sub_event, sub_order in zip(event.sub_events, order.sub_orders):
+                self.add_order(sub_event, sub_order)
 
     def close_order(self, order_id: OrderId, price: Decimal, closed_at: datetime):
         order = self.order_list.get(order_id)
-        trade_type = get_trade_close_type(order.order_type)
 
-        order.trade_close = Trade(
-            type=trade_type,
-            price=price,
-            amount=order.trade_open.amount,
-            created_at=closed_at
-        )
+        if order.sub_orders is None:
+            trade_type = get_trade_close_type(order.order_type)
+
+            order.trade_close = Trade(
+                type=trade_type,
+                price=price,
+                amount=order.trade_open.amount,
+                created_at=closed_at,
+            )
+        else:
+            for sub_order in order.sub_orders:
+                self.close_order(sub_order.id, price, closed_at)
+
         self.log_order_closed(order_id)
 
     def close_order_by_take_profit(self, order_id: OrderId, closed_at: datetime):
@@ -50,11 +61,13 @@ class LocalBroker:
         order = self.order_list.get(order_id)
         opened_at = order.trade_open.created_at
         opened_at_str = format_datetime(opened_at)
-        level_str = f'Level[{order.level[0]}, {order.level[1]}]'
-        logger.info(f'Order opened id={order_id} {order.order_type} {opened_at_str} on {level_str} '
-                    f'by price {order.trade_open.price}, '
-                    f'take profit {order.price_take_profit}, '
-                    f'stop loss {order.price_stop_loss}')
+        level_str = f"Level[{order.level[0]}, {order.level[1]}]"
+        logger.info(
+            f"Order opened id={order_id} {order.order_type} {opened_at_str} on {level_str} "
+            f"by price {order.trade_open.price}, "
+            f"take profit {order.price_take_profit}, "
+            f"stop loss {order.price_stop_loss}"
+        )
 
     def log_order_closed(self, order_id: OrderId):
         """
@@ -64,9 +77,11 @@ class LocalBroker:
         order = self.order_list.get(order_id)
         closed_at = order.trade_close.created_at
         closed_at_str = format_datetime(closed_at)
-        logger.info(f'Order closed id={order_id} {order.order_type} {closed_at_str} '
-                    f'by price {order.trade_close.price}, '
-                    f'with profit/loss {order.get_profit()}')
+        logger.info(
+            f"Order closed id={order_id} {order.order_type} {closed_at_str} "
+            f"by price {order.trade_close.price}, "
+            f"with profit/loss {order.get_profit()}"
+        )
 
     def handle_remote_event(self, event: BrokerEvent):
         order_id = event.order_id

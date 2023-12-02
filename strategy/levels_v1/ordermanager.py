@@ -17,7 +17,7 @@ class DeduplicateOrderManager(OrderManager):
         trend: Union[Trend, str] = None,
         levels_intersection_threshold: Union[Decimal, str] = Decimal(),
         order_intersection_timeout: Union[timedelta, str] = timedelta(),
-        allow_parallel_orders: bool = False
+        allow_parallel_orders: bool = False,
     ):
         super().__init__(order_list)
 
@@ -58,7 +58,7 @@ class DeduplicateOrderManager(OrderManager):
                 order,
                 existing_order,
                 self.levels_intersection_threshold,
-                timeout=self.order_intersection_timeout
+                timeout=self.order_intersection_timeout,
             ):
                 return False, []
 
@@ -66,9 +66,10 @@ class DeduplicateOrderManager(OrderManager):
 
 
 def is_duplicate_order(
-        order_a: Order, order_b: Order,
-        level_intersection_threshold: Decimal,
-        timeout: Optional[timedelta] = None
+    order_a: Order,
+    order_b: Order,
+    level_intersection_threshold: Decimal,
+    timeout: Optional[timedelta] = None,
 ):
     if order_a.order_type != order_b.order_type:
         return False
@@ -78,7 +79,9 @@ def is_duplicate_order(
         if abs(delta.total_seconds()) < timeout.total_seconds():
             return True
 
-    levels_intersection_rate = calc_levels_intersection_rate(order_a.level, order_b.level)
+    levels_intersection_rate = calc_levels_intersection_rate(
+        order_a.level, order_b.level
+    )
     if levels_intersection_rate >= level_intersection_threshold:
         return True
 

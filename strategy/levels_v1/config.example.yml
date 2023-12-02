@@ -15,5 +15,8 @@ emitter:
   min_levels_variation: '0.004'
   calc_trend_on: false
   min_level_interactions: 10
+  sub_orders_count: 1
+  create_lucky_order: false
+  lucky_profit_loss_ratio: 2
   logging_settings:
     trend: false

@@ -16,4 +16,9 @@ def test_calc_MA_list():
     assert calc_MA_list(window, size) == [Decimal(3), Decimal(4), Decimal(6)]
 
     window = [Decimal(3), Decimal(6), Decimal(9), Decimal(9)]
-    assert calc_MA_list(window, size) == [Decimal(3), Decimal(4), Decimal(6), Decimal(8)]
+    assert calc_MA_list(window, size) == [
+        Decimal(3),
+        Decimal(4),
+        Decimal(6),
+        Decimal(8),
+    ]

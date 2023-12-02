@@ -17,7 +17,7 @@ def calc_trend(window: List[Decimal]) -> Trend:
     """
     _, maximums = calc_local_maximums(window)
     if len(maximums) < 2:
-        raise Exception('Lack of extremums. Probably window is too small.')
+        raise Exception("Lack of extremums. Probably window is too small.")
 
     return calc_trend_by_extremums(maximums)
 

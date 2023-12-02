@@ -16,6 +16,7 @@ class EmergencyDetector:
     """
     Example implementation. Not canonical at all.
     """
+
     def __init__(self):
         self.cooldown_max = 10
         self.cooldown = 0

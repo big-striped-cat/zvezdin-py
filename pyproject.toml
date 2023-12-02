@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "zvezdin-py"
+version = "0.1.0"
+description = ""
+authors = ["Evgeny Gusarov <p3gus@yandex.ru>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+requests = "^2.31.0"
+tomli = "^2.0.1"
+PyYAML = "^6.0.1"
+click = "^8.1.7"
+pytz = "^2023.3.post1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+black = "^23.11.0"
+mypy = "^1.7.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
