@@ -27,10 +27,10 @@ cp config.example.yml config.yml
 
 ## Commands
 
-Download Binance kline (candle) data for given ticker and date:
+Download Binance kline (candle) data for given ticker and date range:
 
 ```shell
-./binance-download.sh BTCBUSD-5m-2022-02-26
+python app.py download-klines --from 2022-02-18 --to 2022-02-26 --ticker BTCBUSD
 ```
 
 Kline data is downloaded into market_data/ folder. 

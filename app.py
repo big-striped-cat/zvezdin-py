@@ -1,8 +1,11 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from io import BytesIO
 from typing import Tuple
+from zipfile import ZipFile
 
 import click
+import requests
 
 from backtest import backtest_strategy
 from broker import BrokerSimulator, KlineDataRange
@@ -59,6 +62,26 @@ def backtest(strategy: str, date_from: datetime, date_to: datetime, window_size:
 
     order_manager, emitter = init_strategy_context(strategy)
     backtest_strategy(order_manager, emitter, broker, window_size)
+
+
+@cli.command()
+@click.option('--ticker', 'ticker', type=str, required=True, help='BTCBUSD, ETHUSDT, ...')
+@click.option('--from', 'date_from', type=click.DateTime(), required=True, help='date from')
+@click.option('--to', 'date_to', type=click.DateTime(), required=True, help='date to')
+@click.option('--output-dir', 'output_dir', type=str, default='market_data')
+def download_klines(ticker: str, date_from: datetime, date_to: datetime, output_dir: str):
+    cur_date = date_from
+    while cur_date <= date_to:
+        logger.info('Download %s', cur_date.date())
+        cur_date_str = cur_date.strftime('%Y-%m-%d')
+        url = (
+            f'https://data.binance.vision/data/futures/um/daily/klines/'
+            f'{ticker}/5m/{ticker}-5m-{cur_date_str}.zip'
+        )
+        archive_data = requests.get(url).content
+        zip_file = ZipFile(BytesIO(archive_data))
+        zip_file.extractall(path=output_dir)
+        cur_date += timedelta(days=1)
 
 
 if __name__ == '__main__':
