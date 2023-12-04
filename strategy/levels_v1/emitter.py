@@ -12,8 +12,6 @@ from lib.levels import (
     get_lowest_level,
     calc_level_interactions,
     calc_location,
-    calc_touch_ups,
-    calc_touch_downs,
     Location,
     Level,
     calc_levels_variation,
@@ -50,7 +48,9 @@ class JumpLevelEmitter(SignalEmitter):
         logging_settings: Optional[dict] = None,
         sub_orders_count: int = 1,
         create_lucky_order: bool = True,
-        lucky_profit_loss_ratio: Union[Decimal, str, int] = Decimal(10),
+        order_amount: Union[int, str, Decimal] = Decimal(1),
+        order_amount_precision: int = 0,
+        lucky_profit_loss_ratio: Union[int, str, Decimal] = Decimal(10),
     ):
         if not isinstance(price_open_to_level_ratio_threshold, Decimal):
             price_open_to_level_ratio_threshold = Decimal(
@@ -79,7 +79,9 @@ class JumpLevelEmitter(SignalEmitter):
         self.min_level_interactions = min_level_interactions
         self.sub_orders_count = sub_orders_count
         self.create_lucky_order = create_lucky_order
-        self.lucky_profit_loss_ratio = lucky_profit_loss_ratio
+        self.lucky_profit_loss_ratio = Decimal(lucky_profit_loss_ratio)
+        self.order_amount = Decimal(order_amount)
+        self.order_amount_precision = order_amount_precision
 
         self.calc_levels_strategy = calc_levels_strategy
 
@@ -126,46 +128,54 @@ class JumpLevelEmitter(SignalEmitter):
         level_highest = get_highest_level(levels)
         level_lowest = get_lowest_level(levels)
 
-        for level in (level_lowest, level_highest):
+        order_type_to_level = {
+            OrderType.LONG: level_lowest,
+            OrderType.SHORT: level_highest,
+        }
+        order_type_to_location = {
+            OrderType.LONG: Location.UP,
+            OrderType.SHORT: Location.DOWN,
+        }
+        order_type_to_trends = {
+            OrderType.LONG: (Trend.UP, Trend.FLAT),
+            OrderType.SHORT: (Trend.DOWN, Trend.FLAT),
+        }
+
+        for order_type in (OrderType.LONG, OrderType.SHORT):
+            level = order_type_to_level[order_type]
+
             # It's important that the price interacted with level right before the trading moment
             # It means the level is relevant
             # That's why interactions window must be smaller than global window
             interactions = calc_level_interactions(interactions_window_points, level)
 
+            location = order_type_to_location[order_type]
+            trends = order_type_to_trends[order_type]
+
             if (
-                trend in (Trend.UP, Trend.FLAT)
-                and calc_location(point, level) == Location.UP
+                trend in trends
+                and calc_location(point, level) == location
                 and len(interactions) >= self.min_level_interactions
                 and not self.is_order_late(level, price)
-                and level == level_lowest
             ):
-                close_levels = self.choose_levels_by_variation(levels)
-
-                return create_order_long(
-                    kline,
-                    level,
-                    stop_loss_level_percent=self.stop_loss_level_percent,
-                    close_levels=close_levels,
-                    lucky_profit_loss_ratio=self.lucky_profit_loss_ratio,
-                    auto_close_in=self.auto_close_in,
+                if order_type == OrderType.SHORT:
+                    levels = list(reversed(levels))
+                close_levels = self.choose_levels_by_variation(levels)[
+                    : self.sub_orders_count
+                ]
+                sub_amounts = split_amount(
+                    self.order_amount,
+                    self.sub_orders_count,
+                    self.order_amount_precision,
                 )
 
-            if (
-                trend in (Trend.DOWN, Trend.FLAT)
-                and calc_location(point, level) == Location.DOWN
-                and len(interactions) >= self.min_level_interactions
-                and not self.is_order_late(level, price)
-                and level == level_highest
-            ):
-                # highest level must be first level included to `close_levels`
-                close_levels = list(reversed(levels))
-                close_levels = self.choose_levels_by_variation(close_levels)
-
-                return create_order_short(
+                return create_order_and_sub_orders(
+                    order_type,
                     kline,
                     level,
                     stop_loss_level_percent=self.stop_loss_level_percent,
                     close_levels=close_levels,
+                    sub_amounts=sub_amounts,
                     lucky_profit_loss_ratio=self.lucky_profit_loss_ratio,
                     auto_close_in=self.auto_close_in,
                 )
@@ -189,7 +199,8 @@ class JumpLevelEmitter(SignalEmitter):
         Or some very close levels will be detected.
         On the other side if the window is too large then irrelevant levels appear.
 
-        Function `find_optimal_window_size` looks for minimal interval which gives at least 2 essentially different levels.
+        Function `find_optimal_window_size` looks for minimal interval which gives at least `min_levels`
+        essentially different levels.
 
         :param klines: required `len(klines) >= max_size`
         :param start_size:
@@ -272,34 +283,41 @@ class JumpLevelEmitter(SignalEmitter):
         return price_open_to_level_ratio > self.price_open_to_level_ratio_threshold
 
 
-def create_order_long(
+def create_order_and_sub_orders(
+    order_type: OrderType,
     kline: Kline,
     level: Level,
     stop_loss_level_percent: Decimal,
     close_levels: list[Level],
+    sub_amounts: list[Decimal],
     auto_close_in: timedelta = None,
-    sub_orders_count: int = 1,
     create_lucky_order: bool = False,
     lucky_profit_loss_ratio: Union[int, Decimal, None] = None,
 ) -> Order:
     sub_orders = []
 
-    normal_orders_count = (
-        sub_orders_count - 1 if create_lucky_order else sub_orders_count
-    )
+    normal_orders_count = len(close_levels)
+    if create_lucky_order:
+        normal_orders_count -= 1
 
     level_mid = (level[0] + level[1]) / 2
-    price_stop_loss = add_percent(level_mid, -stop_loss_level_percent)
+
+    if order_type == OrderType.SHORT:
+        price_stop_loss = add_percent(level_mid, stop_loss_level_percent)
+    else:  # long
+        price_stop_loss = add_percent(level_mid, -stop_loss_level_percent)
 
     for order_index in range(normal_orders_count):
         close_level = close_levels[order_index]
         close_level_mid = (close_level[0] + close_level[1]) / 2
+        sub_amount = sub_amounts[order_index]
 
         sub_orders.append(
             create_order(
-                OrderType.LONG,
+                order_type,
                 kline,
                 level,
+                amount=sub_amount,
                 price_take_profit=close_level_mid,
                 price_stop_loss=price_stop_loss,
             )
@@ -309,71 +327,21 @@ def create_order_long(
         price_take_profit = kline.close + lucky_profit_loss_ratio * (
             kline.close - price_stop_loss
         )
+        sub_amount = sub_amounts[-1]
+
         sub_orders.append(
             create_order(
-                OrderType.LONG,
+                order_type,
                 kline,
                 level,
+                amount=sub_amount,
                 price_take_profit=price_take_profit,
                 price_stop_loss=price_stop_loss,
             )
         )
 
     return create_order(
-        OrderType.LONG, kline, level, auto_close_in=auto_close_in, sub_orders=sub_orders
-    )
-
-
-def create_order_short(
-    kline: Kline,
-    level: Level,
-    stop_loss_level_percent: Decimal,
-    close_levels: list[Level],
-    auto_close_in: timedelta = None,
-    sub_orders_count: int = 1,
-    create_lucky_order: bool = False,
-    lucky_profit_loss_ratio: Union[int, Decimal, None] = None,
-) -> Order:
-    sub_orders = []
-
-    normal_orders_count = (
-        sub_orders_count - 1 if create_lucky_order else sub_orders_count
-    )
-
-    level_mid = (level[0] + level[1]) / 2
-    price_stop_loss = add_percent(level_mid, stop_loss_level_percent)
-
-    for order_index in range(normal_orders_count):
-        close_level = close_levels[order_index]
-        close_level_mid = (close_level[0] + close_level[1]) / 2
-
-        sub_orders.append(
-            create_order(
-                OrderType.SHORT,
-                kline,
-                level,
-                price_take_profit=close_level_mid,
-                price_stop_loss=price_stop_loss,
-            )
-        )
-
-    if create_lucky_order:
-        price_take_profit = kline.close + lucky_profit_loss_ratio * (
-            kline.close - price_stop_loss
-        )
-
-        sub_orders.append(
-            create_order(
-                OrderType.SHORT,
-                kline,
-                level,
-                price_take_profit=price_take_profit,
-                price_stop_loss=price_stop_loss,
-            )
-        )
-
-    return create_order(
-        OrderType.SHORT,
+        order_type,
         kline,
         level,
         auto_close_in=auto_close_in,
