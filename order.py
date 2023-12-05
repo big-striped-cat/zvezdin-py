@@ -57,37 +57,60 @@ class Order:
     price_take_profit: Optional[Decimal]
     price_stop_loss: Decimal
     auto_close_in: Optional[timedelta]
-    sub_orders: Optional[List["Order"]]
+    sub_orders: Optional[List["SubOrder"]]
 
-    def get_profit(self, trade_close: Optional[Trade] = None) -> Decimal:
-        if self.sub_orders is None:
-            trade_close = trade_close or self.trade_close
-            profit = trade_close.value() - self.trade_open.value()
-            return {
-                OrderType.LONG: profit,
-                OrderType.SHORT: -profit,
-            }[self.order_type]
+    @property
+    def sign(self) -> int:
+        return {
+            OrderType.LONG: 1,
+            OrderType.SHORT: -1,
+        }[self.order_type]
 
-        return sum((sub_order.get_profit() for sub_order in self.sub_orders), Decimal())
+    def get_profit(self, close_price: Optional[Decimal] = None) -> Decimal:
+        if self.trade_close and close_price is None:
+            close_price = self.trade_close.price
+
+        return sum(
+            (
+                sub_order.get_profit(self.trade_open.price, close_price)
+                for sub_order in self.sub_orders
+            ),
+            Decimal(),
+        )
 
     def get_profit_unrealized(self, price: Decimal) -> Decimal:
-        trade_close = Trade(
-            type=get_trade_close_type(self.order_type),
-            price=price,
-            amount=self.trade_open.amount,
-            created_at=datetime.now(),  # dummy time
-        )
-        return self.get_profit(trade_close=trade_close)
-
-    def is_profit(self) -> bool:
-        return self.get_profit() > 0
+        return self.get_profit(close_price=price)
 
     @property
     def is_closed(self) -> bool:
-        if self.sub_orders is None:
-            return self.trade_close is not None
+        if self.trade_close is not None:
+            return True
 
         return all([sub_order.is_closed for sub_order in self.sub_orders])
+
+
+@dataclass
+class SubOrder:
+    order_type: OrderType
+    amount: Decimal
+    trade_close: Optional[Trade]
+    price_take_profit: Optional[Decimal]
+
+    @property
+    def sign(self) -> int:
+        return {
+            OrderType.LONG: 1,
+            OrderType.SHORT: -1,
+        }[self.order_type]
+
+    def get_profit(
+        self, open_price: Decimal, close_price: Optional[Decimal] = None
+    ) -> Decimal:
+        if self.trade_close and close_price is None:
+            close_price = self.trade_close.price
+
+        profit = self.sign * (close_price - open_price) * self.amount
+        return profit
 
 
 def get_trade_open_type(order_type: OrderType) -> TradeType:

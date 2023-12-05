@@ -19,6 +19,7 @@ class BrokerEventType(enum.Enum):
     order_close = 2
     order_close_by_take_profit = 3
     order_close_by_stop_loss = 4
+    sub_order_close_by_take_profit = 5
 
 
 @dataclass

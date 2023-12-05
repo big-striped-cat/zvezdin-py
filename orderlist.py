@@ -54,6 +54,6 @@ class OrderList:
 
     def profit_unrealized(self, price: Decimal) -> Decimal:
         return sum(
-            (o.get_profit_unrealized(price) for o in self.orders_open.values()),
+            (o.get_profit(price) for o in self.orders_open.values()),
             Decimal(),
         )

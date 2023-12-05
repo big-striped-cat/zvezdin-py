@@ -27,25 +27,17 @@ class LocalBroker:
 
         self.log_order_opened(event.order_id)
 
-        if event.sub_events:
-            for sub_event, sub_order in zip(event.sub_events, order.sub_orders):
-                self.add_order(sub_event, sub_order)
-
     def close_order(self, order_id: OrderId, price: Decimal, closed_at: datetime):
         order = self.order_list.get(order_id)
 
-        if order.sub_orders is None:
-            trade_type = get_trade_close_type(order.order_type)
+        trade_type = get_trade_close_type(order.order_type)
 
-            order.trade_close = Trade(
-                type=trade_type,
-                price=price,
-                amount=order.trade_open.amount,
-                created_at=closed_at,
-            )
-        else:
-            for sub_order in order.sub_orders:
-                self.close_order(sub_order.id, price, closed_at)
+        order.trade_close = Trade(
+            type=trade_type,
+            price=price,
+            amount=order.trade_open.amount,
+            created_at=closed_at,
+        )
 
         self.log_order_closed(order_id)
 
