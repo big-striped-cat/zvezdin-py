@@ -15,3 +15,5 @@ def parse_timedelta(delta: str) -> Optional[timedelta]:
         return timedelta(minutes=number)
     elif unit == "h":
         return timedelta(hours=number)
+
+    raise RuntimeError('Unknown unit')

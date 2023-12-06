@@ -18,10 +18,12 @@ class OrderList:
     OrderList SHOULD NOT make decisions about orders opening/closing.
     OrderList SHOULD NOT mutate order params.
     """
+    orders: dict[OrderId, Order]
+    last_order: Optional[Order]
 
     def __init__(self):
-        self.orders: dict[OrderId, Order] = {}
-        self.last_order: Optional[Order] = None
+        self.orders = {}
+        self.last_order = None
 
     def all(self) -> Iterable[tuple[OrderId, Order]]:
         return self.orders.items()

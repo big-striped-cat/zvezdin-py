@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional, Union, List
 
-from _datetime import timedelta
+from datetime import timedelta
 
 from kline import Kline
 from lib.levels import Level
@@ -16,6 +16,13 @@ logger = logging.getLogger(__name__)
 class OrderType(enum.Enum):
     LONG = 1
     SHORT = 2
+
+    @property
+    def sign(self) -> int:
+        return {
+            OrderType.LONG: 1,
+            OrderType.SHORT: -1,
+        }[self]
 
     def __str__(self):
         return {
@@ -54,17 +61,9 @@ class Order:
     trade_open: Trade
     trade_close: Optional[Trade]
     level: Level
-    price_take_profit: Optional[Decimal]
     price_stop_loss: Decimal
     auto_close_in: Optional[timedelta]
-    sub_orders: Optional[List["SubOrder"]]
-
-    @property
-    def sign(self) -> int:
-        return {
-            OrderType.LONG: 1,
-            OrderType.SHORT: -1,
-        }[self.order_type]
+    sub_orders: List["SubOrder"]
 
     def get_profit(self, close_price: Optional[Decimal] = None) -> Decimal:
         if self.trade_close and close_price is None:
@@ -93,8 +92,8 @@ class Order:
 class SubOrder:
     order_type: OrderType
     amount: Decimal
-    trade_close: Optional[Trade]
-    price_take_profit: Optional[Decimal]
+    price_take_profit: Decimal
+    trade_close: Optional[Trade] = None
 
     @property
     def sign(self) -> int:
@@ -106,11 +105,18 @@ class SubOrder:
     def get_profit(
         self, open_price: Decimal, close_price: Optional[Decimal] = None
     ) -> Decimal:
-        if self.trade_close and close_price is None:
-            close_price = self.trade_close.price
+        if self.trade_close is None and close_price is None:
+            raise ValueError('trade_close attr or close_price param must be set')
 
-        profit = self.sign * (close_price - open_price) * self.amount
+        if close_price is None:
+            close_price = self.trade_close.price  # type: ignore
+
+        profit = self.order_type.sign * (close_price - open_price) * self.amount
         return profit
+
+    @property
+    def is_closed(self) -> bool:
+        return self.trade_close is not None
 
 
 def get_trade_open_type(order_type: OrderType) -> TradeType:
@@ -131,15 +137,11 @@ def create_order(
     order_type: OrderType,
     kline: Kline,
     level: Level,
-    amount: Decimal = Decimal(1),
-    price_take_profit=None,
-    price_stop_loss=None,
-    auto_close_in=None,
-    sub_orders: Optional[list[Order]] = None,
+    amount: Decimal,
+    price_stop_loss: Decimal,
+    auto_close_in: timedelta,
+    sub_orders: list[SubOrder],
 ) -> Order:
-    price_take_profit = price_take_profit or Decimal()
-    price_stop_loss = price_stop_loss or Decimal()
-
     trade_type = get_trade_open_type(order_type)
     trade_open = None
 
@@ -158,7 +160,6 @@ def create_order(
         trade_open=trade_open,
         trade_close=None,
         level=level,
-        price_take_profit=price_take_profit,
         price_stop_loss=price_stop_loss,
         auto_close_in=auto_close_in,
         sub_orders=sub_orders,

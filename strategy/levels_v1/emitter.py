@@ -17,7 +17,7 @@ from lib.levels import (
     calc_levels_variation,
 )
 from lib.trend import Trend, calc_trend
-from order import Order, create_order, OrderType
+from order import Order, create_order, OrderType, SubOrder
 from strategy.emitter import SignalEmitter
 from strategy.utils import parse_timedelta
 
@@ -42,7 +42,7 @@ class JumpLevelEmitter(SignalEmitter):
         interactions_window_size: int = 0,
         levels_window_size_min: int = 0,
         levels_window_size_max: int = 0,
-        min_levels_variation: Union[Decimal, str] = 0,
+        min_levels_variation: Union[Decimal, str] = Decimal(),
         calc_trend_on: bool = True,
         min_level_interactions: int = 10,
         logging_settings: Optional[dict] = None,
@@ -173,6 +173,7 @@ class JumpLevelEmitter(SignalEmitter):
                     order_type,
                     kline,
                     level,
+                    amount=self.order_amount,
                     stop_loss_level_percent=self.stop_loss_level_percent,
                     close_levels=close_levels,
                     sub_amounts=sub_amounts,
@@ -287,12 +288,13 @@ def create_order_and_sub_orders(
     order_type: OrderType,
     kline: Kline,
     level: Level,
+    amount: Decimal,
     stop_loss_level_percent: Decimal,
     close_levels: list[Level],
     sub_amounts: list[Decimal],
-    auto_close_in: timedelta = None,
+    auto_close_in: timedelta,
     create_lucky_order: bool = False,
-    lucky_profit_loss_ratio: Union[int, Decimal, None] = None,
+    lucky_profit_loss_ratio: Optional[Decimal] = None,
 ) -> Order:
     sub_orders = []
 
@@ -302,10 +304,7 @@ def create_order_and_sub_orders(
 
     level_mid = (level[0] + level[1]) / 2
 
-    if order_type == OrderType.SHORT:
-        price_stop_loss = add_percent(level_mid, stop_loss_level_percent)
-    else:  # long
-        price_stop_loss = add_percent(level_mid, -stop_loss_level_percent)
+    price_stop_loss = subtract_percent(level_mid, order_type.sign * stop_loss_level_percent)
 
     for order_index in range(normal_orders_count):
         close_level = close_levels[order_index]
@@ -313,30 +312,24 @@ def create_order_and_sub_orders(
         sub_amount = sub_amounts[order_index]
 
         sub_orders.append(
-            create_order(
+            SubOrder(
                 order_type,
-                kline,
-                level,
                 amount=sub_amount,
                 price_take_profit=close_level_mid,
-                price_stop_loss=price_stop_loss,
             )
         )
 
-    if create_lucky_order:
+    if create_lucky_order and lucky_profit_loss_ratio:
         price_take_profit = kline.close + lucky_profit_loss_ratio * (
             kline.close - price_stop_loss
         )
         sub_amount = sub_amounts[-1]
 
         sub_orders.append(
-            create_order(
+            SubOrder(
                 order_type,
-                kline,
-                level,
                 amount=sub_amount,
-                price_take_profit=price_take_profit,
-                price_stop_loss=price_stop_loss,
+                price_take_profit=price_take_profit
             )
         )
 
@@ -344,17 +337,20 @@ def create_order_and_sub_orders(
         order_type,
         kline,
         level,
+        amount=amount,
+        price_stop_loss=price_stop_loss,
         auto_close_in=auto_close_in,
         sub_orders=sub_orders,
     )
 
 
-def add_percent(d: Decimal, percent: Union[int, Decimal]) -> Decimal:
-    if not isinstance(percent, Decimal):
-        percent = Decimal(percent)
-
+def add_percent(d: Decimal, percent: Decimal) -> Decimal:
     res = d * (1 + Decimal("0.01") * percent)
     return Decimal(round(res))
+
+
+def subtract_percent(d: Decimal, percent: Decimal) -> Decimal:
+    return add_percent(d, -percent)
 
 
 def split_amount(amount: Decimal, num_parts: int, precision: int) -> list[Decimal]:

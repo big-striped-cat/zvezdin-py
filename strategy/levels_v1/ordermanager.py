@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Optional, Union
 
-from _datetime import timedelta
+from datetime import timedelta
 
 from lib.trend import Trend
 from order import Order, OrderType
@@ -14,7 +14,7 @@ class DeduplicateOrderManager(OrderManager):
     def __init__(
         self,
         order_list: OrderList,
-        trend: Union[Trend, str] = None,
+        trend: Optional[Union[Trend, str]] = None,
         levels_intersection_threshold: Union[Decimal, str] = Decimal(),
         order_intersection_timeout: Union[timedelta, str] = timedelta(),
         allow_parallel_orders: bool = False,

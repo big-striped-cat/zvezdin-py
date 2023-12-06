@@ -45,14 +45,9 @@ def init_strategy_context(strategy_name) -> Tuple[OrderManager, SignalEmitter]:
 def backtest(strategy: str, date_from: datetime, date_to: datetime, window_size: int):
     # path = 'market_data/BTCBUSD-5m-2022-02-18.csv'
     path_template = "market_data/BTCBUSD-5m-%Y-%m-%d.csv"
-    date_from = date_from.date()
-    date_to = date_to.date()
-
-    logger.info("date_from %s", date_from)
-    logger.info("date_to %s", date_to)
 
     kline_data_range = KlineDataRange(
-        path_template=path_template, date_from=date_from, date_to=date_to
+        path_template=path_template, date_from=date_from.date(), date_to=date_to.date()
     )
 
     broker = BrokerSimulator(
