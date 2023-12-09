@@ -304,18 +304,28 @@ def create_order_and_sub_orders(
 
     level_mid = (level[0] + level[1]) / 2
 
-    price_stop_loss = subtract_percent(level_mid, order_type.sign * stop_loss_level_percent)
+    price_stop_loss = subtract_percent(
+        level_mid, order_type.sign * stop_loss_level_percent
+    )
 
     for order_index in range(normal_orders_count):
         close_level = close_levels[order_index]
         close_level_mid = (close_level[0] + close_level[1]) / 2
         sub_amount = sub_amounts[order_index]
 
+        if order_index == 0:
+            next_price_stop_loss = level_mid
+        else:
+            prev_close_level = close_levels[order_index - 1]
+            prev_close_level_mid = (prev_close_level[0] + prev_close_level[1]) / 2
+            next_price_stop_loss = prev_close_level_mid
+
         sub_orders.append(
             SubOrder(
                 order_type,
                 amount=sub_amount,
                 price_take_profit=close_level_mid,
+                next_price_stop_loss=next_price_stop_loss,
             )
         )
 
@@ -329,7 +339,7 @@ def create_order_and_sub_orders(
             SubOrder(
                 order_type,
                 amount=sub_amount,
-                price_take_profit=price_take_profit
+                price_take_profit=price_take_profit,
             )
         )
 

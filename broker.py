@@ -1,15 +1,17 @@
 import csv
 import enum
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, timedelta, datetime
 from decimal import Decimal
-from typing import Iterator, Optional, Union, List
+from typing import Iterator, Optional, List
+from utils import format_datetime
 
 import pytz
 
 from kline import Kline
-from order import Order, OrderId
+from order import Order, OrderId, SubOrder
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,7 @@ class BrokerEventType(enum.Enum):
 @dataclass
 class BrokerEvent:
     order_id: OrderId
+    sub_order_index: Optional[int]
     type: BrokerEventType
     created_at: datetime
     price: Decimal
@@ -35,10 +38,13 @@ class Broker:
     def klines(self) -> Iterator[Kline]:
         raise NotImplemented
 
-    def add_order(self, order: Order) -> BrokerEvent:
+    def submit_order(self, order: Order) -> BrokerEvent:
         raise NotImplemented
 
     def events(self, kline) -> list[BrokerEvent]:
+        """
+        :return: events must be ordered by time in ascending order
+        """
         raise NotImplemented
 
     def close_order(self, order_id: OrderId, kline: Kline) -> BrokerEvent:
@@ -71,70 +77,52 @@ class BrokerSimulator(Broker):
     def klines(self) -> Iterator[Kline]:
         return self._klines
 
-    def add_order(self, order: Order) -> BrokerEvent:
+    def submit_order(self, order: Order) -> BrokerEvent:
         self.order_count += 1
         order_id = self.order_count
         self.orders[order_id] = order
 
         event = BrokerEvent(
             order_id=order_id,
+            sub_order_index=None,
             type=BrokerEventType.order_open,
             created_at=order.trade_open.created_at,
             price=order.trade_open.price,
         )
-
-        if order.sub_orders:
-            sub_events = []
-
-            for sub_order in order.sub_orders:
-                self.order_count += 1
-                sub_order_id = self.order_count
-                self.orders[sub_order_id] = sub_order
-
-                sub_events.append(
-                    BrokerEvent(
-                        order_id=sub_order_id,
-                        type=BrokerEventType.order_open,
-                        created_at=sub_order.trade_open.created_at,
-                        price=sub_order.trade_open.price,
-                    )
-                )
-            event.sub_events = sub_events
+        self.log_order_opened(order_id)
 
         return event
 
-    def events(self, kline) -> list[BrokerEvent]:
-        events = []
+    def events(self, kline) -> dict[OrderId, list[BrokerEvent]]:
+        events = defaultdict(lambda: [])
 
         for order_id, order in self.orders.items():
-            if order.sub_orders is not None:
-                continue
-            if event := self.wait_for_order_event(kline, order_id):
-                events.append(event)
-
-        for event in events:
-            if (
-                event.type
-                in (
-                    BrokerEventType.order_close_by_take_profit,
-                    BrokerEventType.order_close_by_stop_loss,
+            for sub_order_index in range(len(order.sub_orders)):
+                events[order_id].extend(
+                    self.wait_for_order_event(kline, order_id, sub_order_index)
                 )
-                and event.order_id in self.orders
-            ):
-                del self.orders[event.order_id]
+
+        for order_events in events.values():
+            for event in order_events:
+                if (
+                    event.type
+                    in (
+                        BrokerEventType.order_close_by_take_profit,
+                        BrokerEventType.order_close_by_stop_loss,
+                    )
+                    and event.order_id in self.orders
+                ):
+                    del self.orders[event.order_id]
 
         return events
 
     def wait_for_order_event(
-        self, kline: Kline, order_id: OrderId
-    ) -> Union[None, BrokerEvent, List[BrokerEvent]]:
+        self, kline: Kline, order_id: OrderId, sub_order_index: int
+    ) -> List[BrokerEvent]:
         order = self.orders[order_id]
+        sub_order = order.sub_orders[sub_order_index]
 
-        if order.sub_orders:
-            # If sub-orders are present then parent order does not emit events.
-            return
-
-        if is_take_profit_achieved(kline, order) and is_stop_loss_achieved(
+        if is_take_profit_achieved(kline, sub_order) and is_stop_loss_achieved(
             kline, order
         ):
             logger.warning(
@@ -150,58 +138,83 @@ class BrokerSimulator(Broker):
                 self.config.get("take_profit_stop_loss_both_achieved")
                 == "close_by_stop_loss"
             ):
-                return BrokerEvent(
-                    order_id=order_id,
-                    type=BrokerEventType.order_close_by_stop_loss,
-                    created_at=kline.open_time,
-                    price=order.price_stop_loss,
-                )
+                return [
+                    BrokerEvent(
+                        order_id=order_id,
+                        sub_order_index=sub_order_index,
+                        type=BrokerEventType.order_close_by_stop_loss,
+                        created_at=kline.open_time,
+                        price=order.price_stop_loss,
+                    )
+                ]
             raise Exception(
                 "Undefined behaviour. Take profit and stop loss both achieved."
             )
 
-        if is_take_profit_achieved(kline, order):
-            return BrokerEvent(
-                order_id=order_id,
-                type=BrokerEventType.order_close_by_take_profit,
-                created_at=kline.open_time,
-                price=order.price_take_profit,
-            )
-
         if is_stop_loss_achieved(kline, order):
-            return BrokerEvent(
-                order_id=order_id,
-                type=BrokerEventType.order_close_by_stop_loss,
-                created_at=kline.open_time,
-                price=order.price_stop_loss,
+            return [
+                BrokerEvent(
+                    order_id=order_id,
+                    sub_order_index=None,
+                    type=BrokerEventType.order_close_by_stop_loss,
+                    created_at=kline.open_time,
+                    price=order.price_stop_loss,
+                )
+            ]
+
+        events = []
+
+        if is_take_profit_achieved(kline, sub_order):
+            events.append(
+                BrokerEvent(
+                    order_id=order_id,
+                    sub_order_index=sub_order_index,
+                    type=BrokerEventType.sub_order_close_by_take_profit,
+                    created_at=kline.open_time,
+                    price=sub_order.price_take_profit,
+                )
             )
+        return events
 
     def close_order(self, order_id: OrderId, kline: Kline) -> BrokerEvent:
-        order = self.orders.pop(order_id)
-
         event = BrokerEvent(
             order_id=order_id,
+            sub_order_index=None,
             type=BrokerEventType.order_close,
             created_at=kline.open_time,
             price=kline.open,
         )
-        if order.sub_orders is None:
-            return event
+        self.log_order_closed(order_id)
+        self.orders.pop(order_id)
 
-        sub_events = []
-
-        for sub_order in order.sub_orders:
-            sub_events.append(
-                BrokerEvent(
-                    order_id=sub_order.id,
-                    type=BrokerEventType.order_close,
-                    created_at=kline.open_time,
-                    price=kline.open,
-                )
-            )
-
-        event.sub_events = sub_events
         return event
+
+    def log_order_opened(self, order_id: OrderId):
+        order = self.orders[order_id]
+        opened_at = order.trade_open.created_at
+        opened_at_str = format_datetime(opened_at)
+        level_str = f"Level[{order.level[0]}, {order.level[1]}]"
+        take_profits_str = ", ".join(str(s.price_take_profit) for s in order.sub_orders)
+        logger.info(
+            f"Order opened id={order_id} {order.order_type} {opened_at_str} on {level_str} "
+            f"by price {order.trade_open.price}, "
+            f"take profits {take_profits_str}, "
+            f"stop loss {order.price_stop_loss}"
+        )
+
+    def log_order_closed(self, order_id: OrderId):
+        """
+        :param order_id
+        :param order: assume order.trade_close is not None
+        """
+        order = self.order_list.get(order_id)
+        closed_at = order.trade_close.created_at
+        closed_at_str = format_datetime(closed_at)
+        logger.info(
+            f"Order closed id={order_id} {order.order_type} {closed_at_str} "
+            f"by price {order.trade_close.price}, "
+            f"with profit/loss {order.get_profit()}"
+        )
 
 
 @dataclass
@@ -278,8 +291,8 @@ def is_price_achieved(kline: Kline, price: Decimal) -> bool:
     return kline.low <= price <= kline.high
 
 
-def is_take_profit_achieved(kline: Kline, order: Order) -> bool:
-    return is_price_achieved(kline, order.price_take_profit)
+def is_take_profit_achieved(kline: Kline, sub_order: SubOrder) -> bool:
+    return is_price_achieved(kline, sub_order.price_take_profit)
 
 
 def is_stop_loss_achieved(kline: Kline, order: Order) -> bool:

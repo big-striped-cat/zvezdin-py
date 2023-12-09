@@ -93,6 +93,7 @@ class SubOrder:
     order_type: OrderType
     amount: Decimal
     price_take_profit: Decimal
+    next_price_stop_loss: Optional[Decimal] = None
     trade_close: Optional[Trade] = None
 
     @property
@@ -106,7 +107,7 @@ class SubOrder:
         self, open_price: Decimal, close_price: Optional[Decimal] = None
     ) -> Decimal:
         if self.trade_close is None and close_price is None:
-            raise ValueError('trade_close attr or close_price param must be set')
+            raise ValueError("trade_close attr or close_price param must be set")
 
         if close_price is None:
             close_price = self.trade_close.price  # type: ignore

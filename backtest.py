@@ -36,8 +36,9 @@ def backtest_strategy(
             event = broker.close_order(order_id, kline)
             local_broker.handle_remote_event(event)
 
-        for event in broker.events(kline):
-            local_broker.handle_remote_event(event)
+        broker_events = broker.events(kline)
+        local_order_updates = local_broker.handle_remote_events(broker_events)
+        broker.update_orders(local_order_updates)
 
         if detector.detect(kline_window):
             logger.warning("Emergency detected at %s", kline.open_time)
@@ -59,7 +60,7 @@ def backtest_strategy(
                 event = broker.close_order(order_id, kline)
                 local_broker.handle_remote_event(event)
 
-            event = broker.add_order(order)
+            event = broker.submit_order(order)
             local_broker.add_order(event, order)
 
         kline_window.pop(0)

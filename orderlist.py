@@ -18,6 +18,7 @@ class OrderList:
     OrderList SHOULD NOT make decisions about orders opening/closing.
     OrderList SHOULD NOT mutate order params.
     """
+
     orders: dict[OrderId, Order]
     last_order: Optional[Order]
 

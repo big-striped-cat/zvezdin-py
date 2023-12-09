@@ -20,7 +20,7 @@ class TestBrokerSimulatorEvents:
             price_stop_loss=Decimal(20),
         )
 
-        event = broker.add_order(order)
+        event = broker.submit_order(order)
         order_id = event.order_id
 
         events = broker.events(kline)
@@ -47,7 +47,7 @@ class TestBrokerSimulatorEvents:
             price_stop_loss=Decimal(35),
         )
 
-        event = broker.add_order(order)
+        event = broker.submit_order(order)
         order_id = event.order_id
 
         events = broker.events(kline)
@@ -74,7 +74,7 @@ class TestBrokerSimulatorEvents:
             price_stop_loss=Decimal(100),
         )
 
-        event = broker.add_order(order)
+        event = broker.submit_order(order)
         order_id = event.order_id
 
         events = broker.events(kline)
@@ -101,7 +101,7 @@ class TestBrokerSimulatorEvents:
             price_stop_loss=Decimal(55),
         )
 
-        event = broker.add_order(order)
+        event = broker.submit_order(order)
         order_id = event.order_id
 
         events = broker.events(kline)
@@ -128,7 +128,7 @@ class TestBrokerSimulatorEvents:
             price_stop_loss=Decimal(20),
         )
 
-        event = broker.add_order(order)
+        event = broker.submit_order(order)
         order_id = event.order_id
 
         events = broker.events(kline)
