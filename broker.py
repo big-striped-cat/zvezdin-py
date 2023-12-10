@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from datetime import date, timedelta, datetime
 from decimal import Decimal
 from typing import Iterator, Optional, List
+
+from localbroker import LocalOrderUpdate
 from utils import format_datetime
 
 import pytz
@@ -31,7 +33,6 @@ class BrokerEvent:
     type: BrokerEventType
     created_at: datetime
     price: Decimal
-    sub_events: Optional[list["BrokerEvent"]] = None
 
 
 class Broker:
@@ -41,13 +42,16 @@ class Broker:
     def submit_order(self, order: Order) -> BrokerEvent:
         raise NotImplemented
 
-    def events(self, kline) -> list[BrokerEvent]:
+    def events(self, kline) -> dict[OrderId, list[BrokerEvent]]:
         """
         :return: events must be ordered by time in ascending order
         """
         raise NotImplemented
 
     def close_order(self, order_id: OrderId, kline: Kline) -> BrokerEvent:
+        raise NotImplemented
+
+    def update_order(self, order_update: LocalOrderUpdate) -> None:
         raise NotImplemented
 
 
@@ -58,10 +62,12 @@ class BrokerSimulator(Broker):
         kline_data_range: Optional["KlineDataRange"] = None,
         config=None,
     ):
-        assert klines_csv_path or kline_data_range
-        path_iter = (
-            (klines_csv_path,) if klines_csv_path else kline_data_range.path_iter()
-        )
+        if klines_csv_path:
+            path_iter = iter((klines_csv_path, ))
+        elif kline_data_range:
+            path_iter = kline_data_range.path_iter()
+        else:
+            raise ValueError('Provide klines_csv_path or kline_data_range')
 
         self.config = config or {}
 
@@ -89,7 +95,6 @@ class BrokerSimulator(Broker):
             created_at=order.trade_open.created_at,
             price=order.trade_open.price,
         )
-        self.log_order_opened(order_id)
 
         return event
 
@@ -174,7 +179,16 @@ class BrokerSimulator(Broker):
                     price=sub_order.price_take_profit,
                 )
             )
+            if sub_order_index == len(order.sub_orders) - 1:
+                # `order.is_closed` is still False at this moment
+                # but the order is closed on remote broker side
+                del self.orders[order_id]
+
         return events
+
+    def update_order(self, order_update: LocalOrderUpdate) -> None:
+        order = self.orders[order_update.order_id]
+        order.price_stop_loss = order_update.price_stop_loss
 
     def close_order(self, order_id: OrderId, kline: Kline) -> BrokerEvent:
         event = BrokerEvent(
@@ -184,37 +198,9 @@ class BrokerSimulator(Broker):
             created_at=kline.open_time,
             price=kline.open,
         )
-        self.log_order_closed(order_id)
         self.orders.pop(order_id)
 
         return event
-
-    def log_order_opened(self, order_id: OrderId):
-        order = self.orders[order_id]
-        opened_at = order.trade_open.created_at
-        opened_at_str = format_datetime(opened_at)
-        level_str = f"Level[{order.level[0]}, {order.level[1]}]"
-        take_profits_str = ", ".join(str(s.price_take_profit) for s in order.sub_orders)
-        logger.info(
-            f"Order opened id={order_id} {order.order_type} {opened_at_str} on {level_str} "
-            f"by price {order.trade_open.price}, "
-            f"take profits {take_profits_str}, "
-            f"stop loss {order.price_stop_loss}"
-        )
-
-    def log_order_closed(self, order_id: OrderId):
-        """
-        :param order_id
-        :param order: assume order.trade_close is not None
-        """
-        order = self.order_list.get(order_id)
-        closed_at = order.trade_close.created_at
-        closed_at_str = format_datetime(closed_at)
-        logger.info(
-            f"Order closed id={order_id} {order.order_type} {closed_at_str} "
-            f"by price {order.trade_close.price}, "
-            f"with profit/loss {order.get_profit()}"
-        )
 
 
 @dataclass

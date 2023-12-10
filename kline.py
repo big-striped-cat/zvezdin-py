@@ -16,7 +16,7 @@ class Kline:
 
 
 def get_moving_window_iterator(values: Iterator, size) -> Iterator[list]:
-    window = []
+    window: list = []
     for value in values:
         if len(window) == size:
             # create another list, do not mutate previous yielded list

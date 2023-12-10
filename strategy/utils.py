@@ -6,7 +6,7 @@ from typing import Optional
 def parse_timedelta(delta: str) -> Optional[timedelta]:
     match = re.match(r"^(\d+)([m|h])$", delta)
     if not match:
-        return
+        return None
 
     number = int(match.group(1))
     unit = match.group(2)

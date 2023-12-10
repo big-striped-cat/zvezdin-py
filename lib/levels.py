@@ -48,15 +48,15 @@ Level = Tuple[Decimal, Decimal]
 
 def calc_levels_by_density(window: List[Decimal]) -> List[Level]:
     eps = Decimal(1)  # depends on asset
-    value_max = max(window) + eps
-    value_min = min(window)
+    value_max: Decimal = max(window) + eps
+    value_min: Decimal = min(window)
 
     sectors_count = 20
     sector_len = (value_max - value_min) / sectors_count
-    points_by_sector_count = defaultdict(lambda: 0)
+    points_by_sector_count: dict[int, int] = defaultdict(lambda: 0)
 
     for point in window:
-        sector_index = (point - value_min) // sector_len
+        sector_index = int((point - value_min) // sector_len)
         points_by_sector_count[sector_index] += 1
 
     points_by_sector_sorted = sorted(
@@ -65,7 +65,7 @@ def calc_levels_by_density(window: List[Decimal]) -> List[Level]:
     levels_count = 5
     top_sectors = points_by_sector_sorted[:levels_count]
 
-    res = []
+    res: list[Level] = []
     for index, count in top_sectors:
         level_bottom = value_min + index * sector_len
         level_top = level_bottom + sector_len
@@ -80,15 +80,15 @@ def calc_levels_by_density(window: List[Decimal]) -> List[Level]:
 
 
 def group_close_points(points: List[Decimal], eps: Decimal) -> List[List[int]]:
-    points_indexed = enumerate(points)
+    points_indexed = list(enumerate(points))
 
     def sort_key(t: Tuple[int, Decimal]):
         index, point = t
         return point
 
-    points_indexed = sorted(points_indexed, key=sort_key)
+    points_indexed.sort(key=sort_key)
     res = []
-    current_level = []
+    current_level: list[int] = []
 
     for index, point in points_indexed:
         if not current_level:
@@ -122,7 +122,7 @@ def deduplicate(x: List[Decimal]) -> List[Decimal]:
 
 
 def avg(x: List[Decimal]) -> Decimal:
-    return round(sum(x) / len(x), 0)
+    return round(sum(x) / len(x), 0)  # type: ignore
 
 
 def calc_levels_by_MA_extremums(klines: List[Kline]) -> List[Level]:
@@ -201,7 +201,7 @@ Interaction = Union[LevelEntry, LevelExit]
 def calc_level_interactions(window: List[Decimal], level: Level) -> List[Interaction]:
     locations = [calc_location(point, level) for point in window]
 
-    interactions = []
+    interactions: list[Interaction] = []
     for prev_location, next_location in zip(locations[:-1], locations[1:]):
         if prev_location == next_location:
             continue

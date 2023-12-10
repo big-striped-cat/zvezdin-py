@@ -2,7 +2,6 @@ import logging
 
 from broker import Broker
 from emergency import EmergencyDetector
-from kline import get_moving_window_iterator
 from localbroker import LocalBroker
 from strategy.ordermanager import OrderManager
 from strategy.emitter import SignalEmitter
@@ -36,9 +35,9 @@ def backtest_strategy(
             event = broker.close_order(order_id, kline)
             local_broker.handle_remote_event(event)
 
-        broker_events = broker.events(kline)
-        local_order_updates = local_broker.handle_remote_events(broker_events)
-        broker.update_orders(local_order_updates)
+        for order_id, order_events in broker.events(kline).items():
+            local_order_update = local_broker.handle_remote_events(order_id, order_events)
+            broker.update_order(local_order_update)
 
         if detector.detect(kline_window):
             logger.warning("Emergency detected at %s", kline.open_time)
