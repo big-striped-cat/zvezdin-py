@@ -47,7 +47,7 @@ class LocalBroker:
 
     def close_sub_order(self, event: BrokerEvent):
         if event.sub_order_index is None:
-            raise ValueError('event.sub_order_index must be set')
+            raise ValueError("event.sub_order_index must be set")
 
         order = self.order_list.get(event.order_id)
         sub_order = order.sub_orders[event.sub_order_index]
@@ -76,7 +76,7 @@ class LocalBroker:
         order_update = None
 
         if not all([e.order_id == order_id for e in events]):
-            logger.warning('All events must belong to order %s', order_id)
+            logger.warning("All events must belong to order %s", order_id)
 
         for event in events:
             order_update = self.handle_remote_event(event)
@@ -95,7 +95,10 @@ class LocalBroker:
         ):
             self.close_order(event.order_id, event.price, event.created_at)
 
-        if event.type == BrokerEventType.sub_order_close_by_take_profit and event.sub_order_index:
+        if (
+            event.type == BrokerEventType.sub_order_close_by_take_profit
+            and event.sub_order_index
+        ):
             self.close_sub_order(event)
 
             sub_order = order.sub_orders[event.sub_order_index]
@@ -106,8 +109,7 @@ class LocalBroker:
                     order.price_stop_loss, sub_order.next_price_stop_loss
                 )
             return LocalOrderUpdate(
-                order_id=event.order_id,
-                price_stop_loss=order.price_stop_loss
+                order_id=event.order_id, price_stop_loss=order.price_stop_loss
             )
         return None
 
@@ -149,7 +151,7 @@ class LocalBroker:
         order = self.order_list.get(order_id)
 
         if not order.trade_close:
-            raise ValueError('order.trade_close must be set')
+            raise ValueError("order.trade_close must be set")
 
         closed_at = order.trade_close.created_at
         closed_at_str = format_datetime(closed_at)

@@ -63,11 +63,11 @@ class BrokerSimulator(Broker):
         config=None,
     ):
         if klines_csv_path:
-            path_iter = iter((klines_csv_path, ))
+            path_iter = iter((klines_csv_path,))
         elif kline_data_range:
             path_iter = kline_data_range.path_iter()
         else:
-            raise ValueError('Provide klines_csv_path or kline_data_range')
+            raise ValueError("Provide klines_csv_path or kline_data_range")
 
         self.config = config or {}
 

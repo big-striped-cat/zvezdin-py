@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from order import Trade, TradeType, Order, OrderType
+from order import Trade, TradeType, Order, OrderType, SubOrder
 
 
 def trade_factory(trade_type=None, price=None, amount=None, created_at=None) -> Trade:
@@ -18,6 +18,7 @@ def order_factory(
     trade_open=None,
     trade_close=None,
     level=None,
+    amount=None,
     price_take_profit=None,
     price_stop_loss=None,
     auto_close_in=None,
@@ -28,12 +29,20 @@ def order_factory(
     price_take_profit = price_take_profit or Decimal()
     price_stop_loss = price_stop_loss or Decimal()
 
+    sub_orders = [
+        SubOrder(
+            order_type=order_type, amount=amount, price_take_profit=price_take_profit
+        )
+    ]
+
     return Order(
+        id=None,
         order_type=order_type,
         trade_open=trade_open,
         trade_close=trade_close,
         level=level,
-        price_take_profit=price_take_profit,
+        amount=amount,
         price_stop_loss=price_stop_loss,
         auto_close_in=auto_close_in,
+        sub_orders=sub_orders,
     )

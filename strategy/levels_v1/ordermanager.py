@@ -1,10 +1,10 @@
 from decimal import Decimal
-from typing import Optional, Union
+from typing import Optional, Union, cast
 
 from datetime import timedelta
 
 from lib.trend import Trend
-from order import Order, OrderType
+from order import Order, OrderType, OrderId
 from orderlist import OrderList
 from strategy.ordermanager import OrderManager
 from strategy.utils import parse_timedelta
@@ -33,10 +33,10 @@ class DeduplicateOrderManager(OrderManager):
         self.trend = trend or Trend.FLAT
 
         self.levels_intersection_threshold = levels_intersection_threshold
-        self.order_intersection_timeout = order_intersection_timeout
+        self.order_intersection_timeout = cast(timedelta, order_intersection_timeout)
         self.allow_parallel_orders = allow_parallel_orders
 
-    def is_order_acceptable(self, order: Order) -> tuple[bool, list[int]]:
+    def is_order_acceptable(self, order: Order) -> tuple[bool, list[OrderId]]:
         if self.trend == Trend.DOWN and order.order_type == OrderType.LONG:
             return False, []
         if self.trend == Trend.UP and order.order_type == OrderType.SHORT:

@@ -3,10 +3,10 @@ from datetime import timedelta
 from typing import Optional
 
 
-def parse_timedelta(delta: str) -> Optional[timedelta]:
+def parse_timedelta(delta: str) -> timedelta:
     match = re.match(r"^(\d+)([m|h])$", delta)
     if not match:
-        return None
+        raise ValueError("Unknown format")
 
     number = int(match.group(1))
     unit = match.group(2)
@@ -16,4 +16,4 @@ def parse_timedelta(delta: str) -> Optional[timedelta]:
     elif unit == "h":
         return timedelta(hours=number)
 
-    raise RuntimeError("Unknown unit")
+    raise ValueError("Unknown unit")

@@ -119,7 +119,7 @@ class JumpLevelEmitter(SignalEmitter):
 
         if not window_size:
             logger.warning("Optimal window not found")
-            return
+            return None
 
         window = klines[-window_size:]
         levels = self.calc_levels(window)
@@ -180,14 +180,10 @@ class JumpLevelEmitter(SignalEmitter):
                     lucky_profit_loss_ratio=self.lucky_profit_loss_ratio,
                     auto_close_in=self.auto_close_in,
                 )
+        return None
 
     def calc_levels(self, klines: list[Kline]) -> list[Level]:
-        calc_func = {
-            CalcLevelsStrategy.by_density: calc_levels_by_density,
-            CalcLevelsStrategy.by_MA_extremums: calc_levels_by_MA_extremums,
-        }[self.calc_levels_strategy]
-
-        levels = calc_func(klines)
+        levels = calc_levels_by_MA_extremums(klines)
         return levels
 
     def find_optimal_window_size(
